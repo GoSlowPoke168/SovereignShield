@@ -1,0 +1,22 @@
+ZERO-TRUST GEOGRAPHIC ROUTING POLICY
+Classification: Internal - Restricted
+Version: 3.1 | Effective: 2025-01-01
+
+ZTP-GEO-001: All software admitted to production environments must originate from
+pre-approved Tier-1 build environments.
+
+ZTP-GEO-002: Digital signatures must be verified against the current vendor manifest
+on file. Hash mismatches constitute an automatic BLOCK condition.
+
+ZTP-GEO-003: Code signing certificates must be valid at time of submission.
+Expired certificates constitute an automatic BLOCK condition.
+
+ZTP-GEO-004: No software compiled in Region-7 jurisdictions may be admitted without
+manual cryptographic verification by the Security Review Board.
+
+ZTP-GEO-005: Any update triggering two or more BLOCK-level policy violations requires
+immediate escalation to the CISO and constitutes an automatic BLOCK condition.
+
+ZTP-GEO-006: All submitted packages must include a valid, vendor-signed SBOM that
+matches the results of an independent deep binary scan. Discrepancies constitute a
+HIGH severity flag and must be reviewed by the Decomposition Agent pipeline.

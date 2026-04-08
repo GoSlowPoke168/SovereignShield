@@ -1,0 +1,22 @@
+# Credentials — NEVER commit
+.env
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Output reports (generated at runtime)
+output/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+testapps/

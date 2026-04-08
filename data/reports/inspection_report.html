@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SovereignShield — Customs Inspection Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:     #050a14;
+      --bg2:    #0a1628;
+      --bg3:    #0f1f3d;
+      --border: #1e3a5f;
+      --text:   #cbd5e1;
+      --muted:  #64748b;
+      --accent: #3b82f6;
+      --accent2:#0ea5e9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 48px 24px;
+      min-height: 100vh;
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 8px;
+    }
+    .shield { font-size: 2.5em; }
+    h1 { font-size: 1.75em; font-weight: 700; color: #f1f5f9;
+          letter-spacing: -0.02em; line-height: 1.2; }
+    .subtitle { color: var(--muted); font-size: 0.85em; margin-top: 2px; }
+    .meta-bar {
+      display: flex; gap: 24px; margin: 20px 0 32px;
+      padding: 14px 20px; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.82em; color: var(--muted);
+    }
+    .meta-bar span { color: var(--text); font-weight: 500; }
+
+    /* ── Verdict banner ── */
+    .verdict-banner {
+      display: flex; align-items: center; gap: 20px;
+      padding: 24px 32px; border-radius: 12px;
+      border: 2px solid #ef4444;
+      background: rgba(239,68,68,0.15);
+      margin-bottom: 32px;
+    }
+    .verdict-icon { font-size: 2.5em; }
+    .verdict-label { font-size: 0.75em; text-transform: uppercase;
+                       letter-spacing: 0.12em; color: #ef4444; font-weight: 600; }
+    .verdict-text  { font-family: 'JetBrains Mono', monospace;
+                       font-size: 2.2em; font-weight: 700; color: #ef4444; }
+    .verdict-count { margin-left: auto; text-align: right; }
+    .verdict-count-num { font-size: 2em; font-weight: 700; color: #ef4444; }
+    .verdict-count-label { font-size: 0.75em; color: var(--muted); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 24px; margin-bottom: 24px;
+    }
+    .card-header {
+      font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--accent2); font-weight: 600; margin-bottom: 16px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--bg3); color: #94a3b8; font-size: 0.75em;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid #0f1b2d; font-size: 0.88em; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: rgba(59,130,246,0.05); }
+    code { font-family: 'JetBrains Mono', monospace; font-size: 0.88em; }
+
+    /* ── Agent summary cards ── */
+    .summary-text { line-height: 1.7; font-size: 0.9em; color: var(--text);
+                      margin-bottom: 14px; }
+    .conf-label { font-size: 0.75em; color: var(--muted); margin-bottom: 6px; }
+
+    /* ── Rationale ── */
+    .rationale { line-height: 1.8; font-size: 0.92em; color: #e2e8f0; }
+    .action-box {
+      margin-top: 16px; padding: 14px 18px;
+      background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 6px; font-size: 0.88em;
+    }
+    .action-label { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.1em;
+                      color: var(--accent); font-weight: 600; margin-bottom: 6px; }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 48px; text-align: center; font-size: 0.78em; color: var(--muted);
+      padding-top: 20px; border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="shield">🛡️</div>
+    <div>
+      <h1>SovereignShield</h1>
+      <div class="subtitle">Customs Inspection Report — Automated Supply-Chain Security Pipeline</div>
+    </div>
+  </div>
+
+  <!-- Meta bar -->
+  <div class="meta-bar">
+    <div>Package &nbsp;<span>juice-shop-19.2.1_node24_win32_x64</span></div>
+    <div>Vendor &nbsp;<span>Unknown Vendor</span></div>
+    <div>Timestamp &nbsp;<span>2026-04-08T23:55:55Z</span></div>
+    <div>Framework &nbsp;<span>NIST SP 800-218</span></div>
+    <div>Model &nbsp;<span>IBM Granite 3.3</span></div>
+  </div>
+
+  <!-- Verdict banner -->
+  <div class="verdict-banner">
+    <div class="verdict-icon">🚫</div>
+    <div>
+      <div class="verdict-label">Final Verdict</div>
+      <div class="verdict-text">BLOCK</div>
+    </div>
+    <div class="verdict-count">
+      <div class="verdict-count-num">9</div>
+      <div class="verdict-count-label">Confirmed Violations</div>
+    </div>
+  </div>
+
+  
+
+  <!-- Confirmed Threats -->
+  <div class="card">
+    <div class="card-header">Confirmed Threats</div>
+    <table>
+      <tr>
+        <th>ID</th><th>Source Agent</th><th>Severity</th>
+        <th>Description</th><th>NIST Reference</th>
+      </tr>
+      <tr><td><code>T-001</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Authorization bypass vulnerability allows attackers to access protected routes without proper authentication.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-002</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Infinite loop in ASF parser can cause denial-of-service when processing specially crafted media files.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-003</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Denial-of-service flaw enables attackers to crash applications handling internationalization through excessive resource consumption.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-004</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Unrestricted key types permit use of insecure legacy keys, potentially leading to token forgery attacks.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-005</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Verification bypass flaw allows tokens signed with weak algorithms to be accepted as valid.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-006</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Command injection vulnerability permits remote code execution via manipulated database queries.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-007</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Memory leak from unbounded stream handling creates denial-of-service risk under sustained attack conditions.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-008</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Malicious request payloads trigger uncontrolled resource allocation, enabling service disruption attacks.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr><tr><td><code>T-009</code></td><td><span style='color:#94a3b8;font-size:0.82em'>DecompositionAgent</span></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td>Sandbox escape vulnerability compromises application isolation, allowing arbitrary code execution within privileged contexts.</td><td><code style='color:#7dd3fc'>PO.1.1</code></td></tr>
+    </table>
+  </div>
+
+  <!-- Agent summaries side by side -->
+  <div class="grid-2">
+
+    <!-- Decomposition Agent -->
+    <div class="card">
+      <div class="card-header">🔍 Decomposition Agent — NIST PO.1.1</div>
+      <p class="summary-text">The SBOM reveals significant discrepancies between declared and scanned components, exposing high-severity vulnerabilities that directly threaten system integrity and availability.</p>
+      <div class="conf-label">Confidence Score</div>
+      <div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#1e293b;border-radius:3px"><div style="width:95%;height:100%;background:#22c55e;border-radius:3px"></div></div><span style="font-size:0.8em;color:#22c55e">0.95</span></div>
+      <br>
+      <table style="margin-top:12px">
+        <tr><th>Dependency</th><th>CVE</th><th>Severity</th><th>Detail</th></tr>
+        <tr><td><code>express-jwt@0.1.3</code></td><td><code style='color:#fca5a5'>GHSA-6g6m-m6h5-w9gf</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Authorization bypass vulnerability allows attackers to access protected routes without proper authentication.</td></tr><tr><td><code>file-type@16.5.4</code></td><td><code style='color:#fca5a5'>GHSA-5v7r-6r5c-r473</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Infinite loop in ASF parser can cause denial-of-service when processing specially crafted media files.</td></tr><tr><td><code>i18n@0.11.1</code></td><td><code style='color:#fca5a5'>GHSA-hfvc-g252-rp4g</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Denial-of-service flaw enables attackers to crash applications handling internationalization through excessive resource consumption.</td></tr><tr><td><code>jsonwebtoken@0.4.0</code></td><td><code style='color:#fca5a5'>GHSA-8cf7-32gw-wr33</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Unrestricted key types permit use of insecure legacy keys, potentially leading to token forgery attacks.</td></tr><tr><td><code>jsonwebtoken@0.4.0</code></td><td><code style='color:#fca5a5'>GHSA-c7hr-j4mj-j2w6</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Verification bypass flaw allows tokens signed with weak algorithms to be accepted as valid.</td></tr><tr><td><code>marsdb@0.6.11</code></td><td><code style='color:#fca5a5'>GHSA-5mrr-rgp6-x4gr</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Command injection vulnerability permits remote code execution via manipulated database queries.</td></tr><tr><td><code>multer@1.4.5-lts.2</code></td><td><code style='color:#fca5a5'>GHSA-44fp-w29j-9vj5</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Memory leak from unbounded stream handling creates denial-of-service risk under sustained attack conditions.</td></tr><tr><td><code>multer@1.4.5-lts.2</code></td><td><code style='color:#fca5a5'>GHSA-4pg4-qvpc-4q3h</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Malicious request payloads trigger uncontrolled resource allocation, enabling service disruption attacks.</td></tr><tr><td><code>notevil@1.3.3</code></td><td><code style='color:#fca5a5'>GHSA-8g4m-cjm2-96wq</code></td><td><span style="background:#1a0800;color:#f97316;border:1px solid #f97316;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:700;letter-spacing:0.05em">HIGH</span></td><td style='font-size:0.85em'>Sandbox escape vulnerability compromises application isolation, allowing arbitrary code execution within privileged contexts.</td></tr>
+      </table>
+    </div>
+
+    <!-- Provenance Agent -->
+    <div class="card">
+      <div class="card-header">🔎 Provenance Agent — NIST PO.3.2</div>
+      <p class="summary-text">All metadata fields comply with zero-trust geographic routing policies; cryptographic trust requirements satisfied.</p>
+      <div class="conf-label">Confidence Score</div>
+      <div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#1e293b;border-radius:3px"><div style="width:100%;height:100%;background:#22c55e;border-radius:3px"></div></div><span style="font-size:0.8em;color:#22c55e">1.00</span></div>
+      <br>
+      <div style="display:flex;gap:16px;margin:12px 0;font-size:0.82em">
+        <span>Signature: <strong style="color:#94a3b8">VERIFIED</strong></span>
+        <span>Cert: <strong style="color:#94a3b8">VALID</strong></span>
+        <span>Origin: <strong></strong></span>
+      </div>
+      <table>
+        <tr><th>Policy Code</th><th>Severity</th><th>Violation</th></tr>
+        <tr><td colspan='3'>No violations</td></tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Arbiter Rationale -->
+  <div class="card">
+    <div class="card-header">⚖️ Arbiter Rationale — NIST RV.1.3</div>
+    <p class="rationale">Nine separate HIGH severity vulnerabilities were identified across critical components including authentication, parsing, internationalization, cryptography, databases, file handling, and sandboxing mechanisms. These collectively violate NIST SP 800-218 PO.1.1 secure coding practices and pose unacceptable risks to system confidentiality, integrity, and availability.</p>
+    <div class="action-box">
+      <div class="action-label">Recommended Action</div>
+      Immediately quarantine affected systems, initiate patch management procedures for all listed dependencies, conduct comprehensive penetration testing after remediation, and review dependency selection processes to prevent future inclusion of vulnerable packages.
+    </div>
+  </div>
+
+  <footer>
+    Generated by SovereignShield v1.0 &nbsp;|&nbsp; IBM Granite 3.3 (ibm/granite-3-3-8b-instruct) &nbsp;|&nbsp;
+    NIST SP 800-218 Aligned &nbsp;|&nbsp; 2026-04-08T23:55:55Z
+  </footer>
+
+</div>
+</body>
+</html>

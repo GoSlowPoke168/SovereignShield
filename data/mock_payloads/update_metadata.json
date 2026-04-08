@@ -1,0 +1,12 @@
+{
+  "package_name": "DataBridge-Enterprise",
+  "version": "4.2.1",
+  "compile_timestamp": "2026-03-28T03:42:17Z",
+  "compile_origin": "Region-7",
+  "compile_origin_detail": "Unverified build server, jurisdiction flagged under ZTP-GEO-004",
+  "vendor_signature_hash": "a3f9b2c1d4e5f6a7b8c9d0e1f2a3b4c5",
+  "manifest_signature_hash": "HASH_MISMATCH_DETECTED",
+  "code_signing_cert": "EXPIRED_2025-11-30",
+  "submission_timestamp": "2026-04-07T08:00:00Z",
+  "submitted_by": "vendor-portal-api"
+}

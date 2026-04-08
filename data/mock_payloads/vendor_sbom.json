@@ -1,0 +1,11 @@
+{
+  "package_name": "DataBridge-Enterprise",
+  "version": "4.2.1",
+  "vendor": "NexaTech Solutions",
+  "declared_dependencies": [
+    {"name": "apache-commons-text", "version": "1.10.0"},
+    {"name": "jackson-databind",    "version": "2.14.2"},
+    {"name": "spring-core",         "version": "6.0.9"},
+    {"name": "slf4j-api",           "version": "2.0.7"}
+  ]
+}
