@@ -140,7 +140,7 @@ Respond with ONLY valid JSON — no prose, no markdown fences — in this exact 
   "inspection_timestamp": "{now_utc}",
   "confirmed_threats": [
     {{
-      "threat_id": "T-001",
+      "threat_id": "<USE EXACT CVE ID (e.g., CVE-2021-3807) OR EXACT POLICY CODE (e.g. SIG-MISMATCH). DO NOT USE T-XXX>",
       "source_agent": "<DecompositionAgent|ProvenanceAgent>",
       "description": "<clear, concise threat description>",
       "severity": "<CRITICAL|HIGH|MEDIUM|LOW>",

@@ -156,79 +156,78 @@ def write_text_report(arbiter: dict, decomp: dict, prov: dict):
 def write_html_report(arbiter: dict, decomp: dict, prov: dict):
     verdict = arbiter.get("verdict", "UNKNOWN")
     is_block = (verdict == "BLOCK")
-    v_color = "#ef4444" if is_block else "#22c55e"
-    v_bg = "rgba(239,68,68,0.15)" if is_block else "rgba(34,197,94,0.15)"
+    v_color = "#d93025" if is_block else "#1e8e3e"
+    v_bg = "rgba(217, 48, 37, 0.08)" if is_block else "rgba(30, 142, 62, 0.08)"
     v_icon = "🚫" if is_block else "✅"
+    
+    # Calculate System Composite Confidence Score
+    c1 = decomp.get('overall_confidence', 0)
+    c2 = prov.get('overall_confidence', 0)
+    sys_confidence = (c1 + c2) / 2 if (c1 and c2) else c1 or c2 or None
+
+    # Calculate statistics for the chart
+    sev_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+    for t in arbiter.get("confirmed_threats", []):
+        s = t.get("severity", "MEDIUM").upper()
+        if s in sev_counts:
+            sev_counts[s] += 1
 
     def severity_badge(sev: str) -> str:
         colors = {
-            "CRITICAL": ("#ef4444", "#1a0000"),
-            "HIGH":     ("#f97316", "#1a0800"),
-            "MEDIUM":   ("#eab308", "#181200"),
-            "LOW":      ("#22c55e", "#001a06"),
+            "CRITICAL": ("#b31412", "#fce8e6"),
+            "HIGH":     ("#d93025", "#fce8e6"),
+            "MEDIUM":   ("#f29900", "#fef7e0"),
+            "LOW":      ("#1e8e3e", "#e6f4ea"),
         }
-        fg, bg = colors.get(sev, ("#94a3b8", "#111"))
+        fg, bg = colors.get(sev, ("#5f6368", "#f1f3f4"))
         return (
-            f'<span style="background:{bg};color:{fg};border:1px solid {fg};'
-            f'padding:2px 8px;border-radius:4px;font-size:0.75em;'
-            f'font-weight:700;letter-spacing:0.05em">{sev}</span>'
+            f'<span style="background:{bg};color:{fg};border:1px solid {bg};'
+            f'padding:6px 12px;border-radius:6px;font-size:0.85em;'
+            f'font-weight:700;letter-spacing:0.04em">{sev}</span>'
         )
 
-    def conf_bar(score: float | None) -> str:
+    def conf_bar(score: float | None, label: str = "") -> str:
         if score is None:
             return "N/A"
         pct = int((score or 0) * 100)
-        fg = "#22c55e" if pct >= 90 else "#eab308" if pct >= 75 else "#ef4444"
+        fg = "#1e8e3e" if pct >= 90 else "#f29900" if pct >= 75 else "#d93025"
+        label_html = f'<div style="font-size:0.7em; color:var(--muted); font-weight:800; text-transform:uppercase; margin-bottom:6px;">{label}</div>' if label else ""
         return (
-            f'<div style="display:flex;align-items:center;gap:8px">'
-            f'<div style="flex:1;height:6px;background:#1e293b;border-radius:3px">'
-            f'<div style="width:{pct}%;height:100%;background:{fg};border-radius:3px"></div>'
-            f'</div><span style="font-size:0.8em;color:{fg}">{score:.2f}</span></div>'
-        )
-
-    threats_rows = ""
-    for t in arbiter.get("confirmed_threats", []):
-        threats_rows += (
-            f"<tr>"
-            f"<td><code>{t['threat_id']}</code></td>"
-            f"<td><span style='color:#94a3b8;font-size:0.82em'>{t['source_agent']}</span></td>"
-            f"<td>{severity_badge(t['severity'])}</td>"
-            f"<td>{t['description']}</td>"
-            f"<td><code style='color:#7dd3fc'>{t['nist_reference']}</code></td>"
-            f"</tr>"
-        )
-
-    decomp_rows = ""
-    for f in decomp.get("findings", []):
-        decomp_rows += (
-            f"<tr>"
-            f"<td><code>{f.get('hidden_dependency','N/A')}</code></td>"
-            f"<td><code style='color:#fca5a5'>{f.get('cve_match','NONE')}</code></td>"
-            f"<td>{severity_badge(f.get('severity','UNKNOWN'))}</td>"
-            f"<td style='font-size:0.85em'>{f.get('detail','')}</td>"
-            f"</tr>"
+            f'<div style="margin-bottom:12px;">{label_html}'
+            f'<div style="display:flex;align-items:center;gap:12px">'
+            f'<div style="flex:1;height:10px;background:rgba(0,0,0,0.06);border-radius:5px; overflow:hidden;">'
+            f'<div style="width:{pct}%;height:100%;background:{fg};border-radius:5px; transition: width 1s ease-out;"></div>'
+            f'</div><span style="font-size:1em;color:{fg};font-weight:800">{pct}%</span></div></div>'
         )
 
     prov_findings = prov.get("findings", {})
-    violations_rows = ""
-    for v in prov_findings.get("violations", []):
-        violations_rows += (
-            f"<tr>"
-            f"<td><code style='color:#7dd3fc'>{v.get('policy_code','')}</code></td>"
-            f"<td>{severity_badge(v.get('severity','MEDIUM'))}</td>"
-            f"<td style='font-size:0.85em'>{v.get('violation_detail','')}</td>"
+    threats_rows = ""
+    for idx, t in enumerate(arbiter.get("confirmed_threats", [])):
+        tid = t.get('threat_id', 'UNKNOWN')
+        if "CVE-" in tid.upper():
+            tid_html = f'<a href="https://nvd.nist.gov/vuln/detail/{tid}" target="_blank" style="color:#d93025;text-decoration:none;font-weight:700;border-bottom:2px solid rgba(217, 48, 37, 0.2); transition: border-color 0.2s;">{tid}</a>'
+        else:
+            tid_html = f'<code>{tid}</code>'
+            
+        threats_rows += (
+            f'<tr style="animation: fadeInUp 0.4s ease forwards; animation-delay: {0.5 + (idx * 0.08)}s; opacity:0;">'
+            f"<td>{tid_html}</td>"
+            f"<td><span style='color:#5f6368;font-size:0.85em;font-weight:600;text-transform:uppercase;'>{t['source_agent']}</span></td>"
+            f"<td>{severity_badge(t['severity'])}</td>"
+            f"<td style='line-height:1.6;color:#3c4043; font-weight:500;'>{t['description']}</td>"
+            f"<td><span style='background:rgba(26, 115, 232, 0.1);color:#1a73e8;padding:6px 12px;border-radius:6px;font-size:0.85em;font-family:\"JetBrains Mono\", monospace; font-weight:600;'>{t['nist_reference']}</span></td>"
             f"</tr>"
         )
 
     flags_html = ""
     for flag in arbiter.get("low_confidence_flags", []):
-        flags_html += f'<li style="margin:6px 0;color:#fbbf24">{flag}</li>'
+        flags_html += f'<li style="margin:10px 0;color:#d28e00; font-weight:500;">{flag}</li>'
     flags_section = ""
     if flags_html:
         flags_section = f"""
-        <div class="card" style="border-color:#fbbf24">
-          <div class="card-header" style="color:#fbbf24">⚠ Agentic Feedback Loop — Low-Confidence Flags</div>
-          <ul style="margin:0;padding-left:20px">{flags_html}</ul>
+        <div class="card glass animate-in" style="border-left: 8px solid #f29900; animation-delay: 0.2s;">
+          <div class="card-header" style="color:#d28e00">⚠ Agentic Feedback Loop — Low-Confidence Flags</div>
+          <ul style="margin:0;padding-left:26px">{flags_html}</ul>
         </div>"""
 
     timestamp = arbiter.get("inspection_timestamp", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
@@ -240,208 +239,259 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SovereignShield — Customs Inspection Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {{
-      --bg:     #050a14;
-      --bg2:    #0a1628;
-      --bg3:    #0f1f3d;
-      --border: #1e3a5f;
-      --text:   #cbd5e1;
-      --muted:  #64748b;
-      --accent: #3b82f6;
-      --accent2:#0ea5e9;
+      --bg: #f5f7fa;
+      --glass: rgba(255, 255, 255, 0.82);
+      --border: rgba(218, 220, 224, 0.7);
+      --text: #1a1b1e;
+      --muted: #64748b;
+      --accent: #1a73e8;
+      --shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
     }}
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: radial-gradient(circle at top right, #eef2f7, #f5f7fa 40%),
+                  radial-gradient(circle at bottom left, #e2e8f0, #f5f7fa 40%);
+      background-attachment: fixed;
       color: var(--text);
-      padding: 48px 24px;
+      padding: 60px 20px;
       min-height: 100vh;
+      line-height: 1.6;
     }}
-    .container {{ max-width: 1100px; margin: 0 auto; }}
+    .container {{ max-width: 1140px; margin: 0 auto; }}
 
-    /* ── Header ── */
-    .header {{
-      display: flex; align-items: center; gap: 16px;
-      margin-bottom: 8px;
+    /* Glass Effect & Hover Lift */
+    .glass {{
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }}
-    .shield {{ font-size: 2.5em; }}
-    h1 {{ font-size: 1.75em; font-weight: 700; color: #f1f5f9;
-          letter-spacing: -0.02em; line-height: 1.2; }}
-    .subtitle {{ color: var(--muted); font-size: 0.85em; margin-top: 2px; }}
+    .glass:hover {{
+      transform: translateY(-10px) scale(1.01);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+      border-color: var(--accent);
+    }}
+
+    /* Animations */
+    @keyframes fadeInUp {{
+      from {{ opacity: 0; transform: translateY(40px); }}
+      to {{ opacity: 1; transform: translateY(0); }}
+    }}
+    .animate-in {{
+      animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }}
+
+    .header {{ display: flex; align-items: center; gap: 28px; margin-bottom: 40px; }}
+    .shield-logo {{ width: 72px; height: 72px; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.2)); transition: transform 0.6s ease; }}
+    .shield-logo:hover {{ transform: rotate(15deg) scale(1.15); }}
+    h1 {{ font-size: 2.5em; font-weight: 900; color: #1a1b1e; letter-spacing: -0.04em; }}
+    .subtitle {{ color: var(--muted); font-size: 1.05em; font-weight: 500; margin-top: 4px; }}
+
     .meta-bar {{
-      display: flex; gap: 24px; margin: 20px 0 32px;
-      padding: 14px 20px; background: var(--bg2);
-      border: 1px solid var(--border); border-radius: 8px;
-      font-size: 0.82em; color: var(--muted);
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 28px; margin-bottom: 40px; padding: 26px 36px;
     }}
-    .meta-bar span {{ color: var(--text); font-weight: 500; }}
+    .meta-item {{ font-size: 0.9em; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }}
+    .meta-item span {{ display: block; color: var(--text); font-weight: 700; margin-top: 6px; font-size: 1.25em; text-transform: none; letter-spacing: normal; }}
 
-    /* ── Verdict banner ── */
     .verdict-banner {{
-      display: flex; align-items: center; gap: 20px;
-      padding: 24px 32px; border-radius: 12px;
-      border: 2px solid {v_color};
-      background: {v_bg};
-      margin-bottom: 32px;
+      display: flex; align-items: center; gap: 40px;
+      padding: 36px 48px; margin-bottom: 40px;
+      border-left: 10px solid {v_color};
     }}
-    .verdict-icon {{ font-size: 2.5em; }}
-    .verdict-label {{ font-size: 0.75em; text-transform: uppercase;
-                       letter-spacing: 0.12em; color: {v_color}; font-weight: 600; }}
-    .verdict-text  {{ font-family: 'JetBrains Mono', monospace;
-                       font-size: 2.2em; font-weight: 700; color: {v_color}; }}
-    .verdict-count {{ margin-left: auto; text-align: right; }}
-    .verdict-count-num {{ font-size: 2em; font-weight: 700; color: {v_color}; }}
-    .verdict-count-label {{ font-size: 0.75em; color: var(--muted); }}
+    .verdict-icon {{ font-size: 4em; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.12)); }}
+    .verdict-label {{ font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.2em; color: {v_color}; font-weight: 900; margin-bottom: 6px; }}
+    .verdict-text {{ font-family: 'JetBrains Mono', monospace; font-size: 3.2em; font-weight: 800; color: {v_color}; line-height: 1; }}
+    .verdict-stats {{ margin-left: auto; display: flex; gap: 56px; text-align: right; }}
+    .stat-val {{ font-size: 3em; font-weight: 900; color: {v_color}; line-height: 1; }}
+    .stat-label {{ font-size: 0.85em; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 8px; }}
 
-    /* ── Cards ── */
-    .card {{
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: 10px; padding: 24px; margin-bottom: 24px;
-    }}
+    .card {{ padding: 40px; margin-bottom: 40px; position: relative; overflow: visible; }}
     .card-header {{
-      font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.1em;
-      color: var(--accent2); font-weight: 600; margin-bottom: 16px;
-      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+      font-size: 1em; text-transform: uppercase; letter-spacing: 0.15em;
+      color: var(--accent); font-weight: 900; margin-bottom: 30px;
+      padding-bottom: 16px; border-bottom: 3px solid var(--border);
     }}
-    .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
 
-    /* ── Tables ── */
-    table {{ width: 100%; border-collapse: collapse; }}
+    .grid-summary {{ display: grid; grid-template-columns: 1.4fr 1.15fr; gap: 40px; margin-bottom: 40px; align-items: stretch; }}
+    
+    table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 16px; }}
     th {{
-      background: var(--bg3); color: #94a3b8; font-size: 0.75em;
-      text-transform: uppercase; letter-spacing: 0.08em;
-      padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border);
+      text-align: left; padding: 20px; font-size: 0.85em;
+      text-transform: uppercase; color: var(--muted); font-weight: 900;
+      border-bottom: 3px solid var(--border);
     }}
-    td {{ padding: 10px 12px; border-bottom: 1px solid #0f1b2d; font-size: 0.88em; }}
+    td {{ padding: 22px 20px; border-bottom: 1px solid var(--border); font-size: 1em; transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1); }}
     tr:last-child td {{ border-bottom: none; }}
-    tr:hover {{ background: rgba(59,130,246,0.05); }}
-    code {{ font-family: 'JetBrains Mono', monospace; font-size: 0.88em; }}
+    tr:hover td {{ background: rgba(26, 115, 232, 0.07); transform: translateX(8px); }}
+    code {{ font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.05); padding: 5px 10px; border-radius: 8px; font-size: 0.95em; font-weight: 600; }}
 
-    /* ── Agent summary cards ── */
-    .summary-text {{ line-height: 1.7; font-size: 0.9em; color: var(--text);
-                      margin-bottom: 14px; }}
-    .conf-label {{ font-size: 0.75em; color: var(--muted); margin-bottom: 6px; }}
-
-    /* ── Rationale ── */
-    .rationale {{ line-height: 1.8; font-size: 0.92em; color: #e2e8f0; }}
     .action-box {{
-      margin-top: 16px; padding: 14px 18px;
-      background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25);
-      border-radius: 6px; font-size: 0.88em;
+      margin-top: 32px; padding: 28px; border-radius: 16px;
+      background: rgba(26, 115, 232, 0.1); border-left: 8px solid var(--accent);
+      transition: background 0.3s ease;
     }}
-    .action-label {{ font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.1em;
-                      color: var(--accent); font-weight: 600; margin-bottom: 6px; }}
+    .action-box:hover {{ background: rgba(26, 115, 232, 0.15); }}
+    .action-label {{ font-size: 0.85em; text-transform: uppercase; font-weight: 900; color: var(--accent); margin-bottom: 12px; letter-spacing: 0.1em; }}
+    
+    .chart-container {{ height: 320px; position: relative; padding: 15px; overflow: visible; }}
 
-    /* ── Footer ── */
     footer {{
-      margin-top: 48px; text-align: center; font-size: 0.78em; color: var(--muted);
-      padding-top: 20px; border-top: 1px solid var(--border);
+      margin-top: 100px; text-align: center; color: var(--muted); font-size: 0.9em;
+      padding-top: 50px; border-top: 1px solid var(--border); font-weight: 600;
     }}
   </style>
 </head>
 <body>
 <div class="container">
 
-  <!-- Header -->
-  <div class="header">
-    <div class="shield">🛡️</div>
+  <header class="header animate-in">
+    <img src="../assets/sovereignshield_logo.png" alt="SovereignShield Logo" class="shield-logo">
     <div>
       <h1>SovereignShield</h1>
-      <div class="subtitle">Customs Inspection Report — Automated Supply-Chain Security Pipeline</div>
+      <div class="subtitle">Customs Inspection Report &bull; Strategic Supply-Chain Defense Dashboard</div>
     </div>
+  </header>
+
+  <div class="meta-bar glass animate-in" style="animation-delay: 0.1s;">
+    <div class="meta-item">Package <span>{arbiter.get('package', 'N/A')}</span></div>
+    <div class="meta-item">Vendor <span>{arbiter.get('vendor', 'Unknown')}</span></div>
+    <div class="meta-item">Timestamp <span>{timestamp}</span></div>
+    <div class="meta-item">Framework <span>NIST SP 800-218</span></div>
   </div>
 
-  <!-- Meta bar -->
-  <div class="meta-bar">
-    <div>Package &nbsp;<span>{arbiter.get('package', 'N/A')}</span></div>
-    <div>Vendor &nbsp;<span>{arbiter.get('vendor', 'N/A')}</span></div>
-    <div>Timestamp &nbsp;<span>{timestamp}</span></div>
-    <div>Framework &nbsp;<span>NIST SP 800-218</span></div>
-    <div>Model &nbsp;<span>IBM Granite 3.3</span></div>
-  </div>
-
-  <!-- Verdict banner -->
-  <div class="verdict-banner">
+  <div class="verdict-banner glass animate-in" style="animation-delay: 0.15s;">
     <div class="verdict-icon">{v_icon}</div>
     <div>
-      <div class="verdict-label">Final Verdict</div>
+      <div class="verdict-label">Official Verdict</div>
       <div class="verdict-text">{verdict}</div>
     </div>
-    <div class="verdict-count">
-      <div class="verdict-count-num">{arbiter.get('total_violations', 0)}</div>
-      <div class="verdict-count-label">Confirmed Violations</div>
+    <div class="verdict-stats">
+      <div>
+        <div class="stat-val">{arbiter.get('total_violations', 0)}</div>
+        <div class="stat-label">Violations</div>
+      </div>
+      <div>
+        <div class="stat-val">{int((sys_confidence or 0)*100)}%</div>
+        <div class="stat-label">Composite Trust</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-summary">
+    <div class="card glass animate-in" style="animation-delay: 0.2s;">
+      <div class="card-header">⚖️ Executive Risk Rationale</div>
+      <p style="font-size: 1.15em; line-height: 1.8; font-weight: 500;">{arbiter.get('verdict_rationale', 'N/A')}</p>
+      <div class="action-box glass" style="box-shadow: none;">
+        <div class="action-label">Recommended Action</div>
+        <div style="font-weight: 700; font-size: 1.1em;">{arbiter.get('recommended_action', 'N/A')}</div>
+      </div>
+    </div>
+
+    <div class="card glass animate-in" style="animation-delay: 0.3s;">
+      <div class="card-header">📊 Risk Profile Index</div>
+      <div class="chart-container">
+        <canvas id="riskChart"></canvas>
+      </div>
     </div>
   </div>
 
   {flags_section}
 
-  <!-- Confirmed Threats -->
-  <div class="card">
-    <div class="card-header">Confirmed Threats</div>
+  <div class="card glass animate-in" style="animation-delay: 0.4s;">
+    <div class="card-header">🔎 Detailed Forensics & Proof</div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
+      <div class="glass" style="padding: 24px; background: rgba(0,0,0,0.04); border-radius: 16px; box-shadow: none;">
+        <div style="margin-bottom: 20px; font-size: 0.9em; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Agent Confidence Levels</div>
+        {conf_bar(decomp.get('overall_confidence'), "Decomposition Analysis Agent")}
+        <div style="margin-top: 16px;"></div>
+        {conf_bar(prov.get('overall_confidence'), "Provenance Verification Agent")}
+      </div>
+      
+      <div class="glass" style="padding: 24px; background: rgba(0,0,0,0.04); border-radius: 16px; display: grid; gap: 14px; font-size: 1em; box-shadow: none;">
+         <div style="font-size: 0.9em; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Compliance Metadata</div>
+         <div>Origin Country: <strong style="float:right; color:var(--accent);">{prov_findings.get('compile_origin','N/A')}</strong></div>
+         <div>Cert Validation: <strong style="float:right; color:{'#d93025' if prov_findings.get('cert_status')=='EXPIRED' else '#1e8e3e'}">{prov_findings.get('cert_status','N/A')}</strong></div>
+         <div>Sec Signature: <strong style="float:right; color:{'#d93025' if prov_findings.get('signature_status')=='MISMATCH' else '#1e8e3e'}">{prov_findings.get('signature_status','N/A')}</strong></div>
+      </div>
+    </div>
+
     <table>
-      <tr>
-        <th>ID</th><th>Source Agent</th><th>Severity</th>
-        <th>Description</th><th>NIST Reference</th>
-      </tr>
-      {threats_rows if threats_rows else "<tr><td colspan='5' style='text-align:center;color:#64748b'>No threats confirmed</td></tr>"}
+      <thead>
+        <tr>
+          <th>Target ID</th><th>Discovery Agent</th><th>Severity</th><th>Description</th><th>NIST Clause</th>
+        </tr>
+      </thead>
+      <tbody>
+        {threats_rows if threats_rows else "<tr><td colspan='5' style='text-align:center; padding: 70px; color: var(--muted); font-weight: 700; font-size: 1.1em;'>Clean Sweep: No vulnerabilities identified.</td></tr>"}
+      </tbody>
     </table>
   </div>
 
-  <!-- Agent summaries side by side -->
-  <div class="grid-2">
-
-    <!-- Decomposition Agent -->
-    <div class="card">
-      <div class="card-header">🔍 Decomposition Agent — NIST PO.1.1</div>
-      <p class="summary-text">{decomp.get('summary', 'No summary available.')}</p>
-      <div class="conf-label">Confidence Score</div>
-      {conf_bar(decomp.get('overall_confidence'))}
-      <br>
-      <table style="margin-top:12px">
-        <tr><th>Dependency</th><th>CVE</th><th>Severity</th><th>Detail</th></tr>
-        {decomp_rows if decomp_rows else "<tr><td colspan='4'>No findings</td></tr>"}
-      </table>
-    </div>
-
-    <!-- Provenance Agent -->
-    <div class="card">
-      <div class="card-header">🔎 Provenance Agent — NIST PO.3.2</div>
-      <p class="summary-text">{prov_findings.get('summary', 'No summary available.')}</p>
-      <div class="conf-label">Confidence Score</div>
-      {conf_bar(prov.get('overall_confidence'))}
-      <br>
-      <div style="display:flex;gap:16px;margin:12px 0;font-size:0.82em">
-        <span>Signature: <strong style="color:{'#ef4444' if prov_findings.get('signature_status')=='MISMATCH' else '#94a3b8'}">{prov_findings.get('signature_status','N/A')}</strong></span>
-        <span>Cert: <strong style="color:{'#ef4444' if prov_findings.get('cert_status')=='EXPIRED' else '#94a3b8'}">{prov_findings.get('cert_status','N/A')}</strong></span>
-        <span>Origin: <strong>{prov_findings.get('compile_origin','N/A')}</strong></span>
-      </div>
-      <table>
-        <tr><th>Policy Code</th><th>Severity</th><th>Violation</th></tr>
-        {violations_rows if violations_rows else "<tr><td colspan='3'>No violations</td></tr>"}
-      </table>
-    </div>
-
-  </div>
-
-  <!-- Arbiter Rationale -->
-  <div class="card">
-    <div class="card-header">⚖️ Arbiter Rationale — NIST RV.1.3</div>
-    <p class="rationale">{arbiter.get('verdict_rationale', 'No rationale provided.')}</p>
-    <div class="action-box">
-      <div class="action-label">Recommended Action</div>
-      {arbiter.get('recommended_action', 'N/A')}
-    </div>
-  </div>
-
   <footer>
-    Generated by SovereignShield v1.0 &nbsp;|&nbsp; IBM Granite 3.3 (ibm/granite-3-3-8b-instruct) &nbsp;|&nbsp;
-    NIST SP 800-218 Aligned &nbsp;|&nbsp; {timestamp}
+    &copy; 2026 SovereignShield Security Pipeline &bull; v1.4 High-Performance Edition &bull; NIST SP 800-218 RV.1.3 Compliance
   </footer>
-
 </div>
+
+<script>
+  const ctx = document.getElementById('riskChart').getContext('2d');
+  new Chart(ctx, {{
+    type: 'doughnut',
+    data: {{
+      labels: ['Critical', 'High', 'Medium', 'Low'],
+      datasets: [{{
+        data: [{sev_counts['CRITICAL']}, {sev_counts['HIGH']}, {sev_counts['MEDIUM']}, {sev_counts['LOW']}],
+        backgroundColor: ['#b31412', '#d93025', '#f29900', '#1e8e3e'],
+        borderWidth: 0,
+        hoverOffset: 25
+      }}]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {{
+        padding: {{
+          left: 10,
+          right: 30,
+          top: 30,
+          bottom: 30
+        }}
+      }},
+      plugins: {{
+        legend: {{ 
+          position: 'right', 
+          labels: {{ 
+            usePointStyle: true, 
+            padding: 25,
+            font: {{ size: 16, weight: '800', family: "'Inter', sans-serif" }},
+            color: '#1a1b1e'
+          }} 
+        }},
+        tooltip: {{
+          enabled: true,
+          backgroundColor: 'rgba(26, 27, 30, 0.95)',
+          padding: 16,
+          titleFont: {{ size: 16, weight: '900' }},
+          bodyFont: {{ size: 14, weight: '700' }},
+          cornerRadius: 12,
+          displayColors: true,
+          boxPadding: 8
+        }}
+      }},
+      cutout: '74%'
+    }}
+  }});
+</script>
 </body>
 </html>"""
 
@@ -449,6 +499,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print_ok(f"HTML report written  → {out_path}")
+
 
 
 # ── Pipeline orchestrator ──────────────────────────────────────────────────────

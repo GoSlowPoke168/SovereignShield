@@ -192,7 +192,16 @@ def run_deep_scan(target_binary: str | Path) -> dict:
             
             # Print spinner with cyan color styling matching SovereignShield UI
             target_display_name = target.name if len(target_to_parse) > 1 else target_to_parse[0].name
-            sys.stdout.write(f"\r  \033[96m{spinner[i % len(spinner)]}\033[0m [Scanner] Executing Syft deep scan on {target_display_name} (Elapsed: {int(elapsed)}s | {eta_str})   ")
+            
+            # Truncate filename if it's too long to prevent line wrapping on 80-char terminals
+            display_name = target_display_name
+            if len(display_name) > 24:
+                display_name = display_name[:21] + "..."
+                
+            # Use \033[2K to clear the entire line before writing, and \r to return to start
+            # This is more robust than just \r if the line length changes or wraps
+            msg = f"\r\033[2K  \033[96m{spinner[i % len(spinner)]}\033[0m [Scanner] Scanning {display_name} ({int(elapsed)}s | {eta_str}) "
+            sys.stdout.write(msg)
             sys.stdout.flush()
             i += 1
             time.sleep(0.1)
@@ -209,7 +218,7 @@ def run_deep_scan(target_binary: str | Path) -> dict:
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=300 # 5 minute strict timeout to prevent permanent hangs
+                timeout=600 # 10 minute strict timeout for large binaries like WebGoat
             )
             try:
                 syft_data = json.loads(result.stdout)
