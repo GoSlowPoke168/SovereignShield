@@ -1,31 +1,17 @@
-"""
-agents/arbiter_agent.py
-────────────────────────
-NIST SP 800-218 — Practice RV.1.3
-"Analyze identified vulnerabilities to determine risk and appropriate response."
-
-The Arbiter is the final authority in the SovereignShield pipeline.
-It synthesises the exact output of the Decomposition and Provenance agents,
-applies the confidence-threshold feedback loop (a genuine agentic decision
-rather than a fixed sequential pipeline), and issues the definitive
-BLOCK or ALLOW command.
-    real conditional reasoning and is highlighted in the terminal output.
-  • The LLM prompt explicitly passes these flags so it can justify them
-    in the verdict rationale.
-"""
-
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Allow running this file directly for isolated testing
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from watsonx_client import get_model
+
+from .. import config
+from .. import ui
+from .. import utils
+from ..watsonx_client import get_model
 
 _model = None
-CONFIDENCE_THRESHOLD = 0.75
-
 
 def _get_model():
     global _model
@@ -34,48 +20,26 @@ def _get_model():
     return _model
 
 
-def _extract_json(raw: str) -> dict:
-    text = raw.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    fence_match = re.search(r"```(?:json)?\s*([\s\S]+?)```", text)
-    if fence_match:
-        try:
-            return json.loads(fence_match.group(1).strip())
-        except json.JSONDecodeError:
-            pass
-    brace_match = re.search(r"\{[\s\S]+\}", text)
-    if brace_match:
-        try:
-            return json.loads(brace_match.group(0))
-        except json.JSONDecodeError:
-            pass
-    raise ValueError(f"Could not extract valid JSON from model response:\n{raw[:500]}")
-
-
 def _build_confidence_note(decomp: dict, prov: dict) -> tuple[list[str], str]:
     """
     Evaluate upstream confidence scores and build the feedback-loop note
     that is injected into the Arbiter's prompt.
-
-    Returns (flags_list, formatted_note_string).
     """
     flags: list[str] = []
     decomp_conf = decomp.get("overall_confidence", 1.0)
     prov_conf = prov.get("overall_confidence", 1.0)
+    threshold = config.CONFIDENCE_THRESHOLD
 
-    if decomp_conf < CONFIDENCE_THRESHOLD:
+    if decomp_conf < threshold:
         flags.append(
             f"DecompositionAgent confidence {decomp_conf:.2f} is below threshold "
-            f"{CONFIDENCE_THRESHOLD}. A secondary binary deep-scan is required "
+            f"{threshold}. A secondary binary deep-scan is required "
             "before this verdict can be considered final."
         )
-    if prov_conf < CONFIDENCE_THRESHOLD:
+    if prov_conf < threshold:
         flags.append(
             f"ProvenanceAgent confidence {prov_conf:.2f} is below threshold "
-            f"{CONFIDENCE_THRESHOLD}. Manual cryptographic verification by the "
+            f"{threshold}. Manual cryptographic verification by the "
             "Security Review Board is required before this verdict can be considered final."
         )
 
@@ -88,19 +52,9 @@ def _build_confidence_note(decomp: dict, prov: dict) -> tuple[list[str], str]:
     return flags, note
 
 
-def run(decomp_findings: dict, prov_findings: dict, package_name: str = "Unknown Package", vendor_name: str = "Unknown Vendor", max_retries: int = 2) -> dict:
+def run(decomp_findings: dict, prov_findings: dict, package_name: str = "Unknown Package", vendor_name: str = "Unknown Vendor", max_retries: int = config.MAX_RETRIES) -> dict:
     """
     Invoke the Arbiter Agent and return the full Customs Inspection Report.
-
-    Parameters
-    ----------
-    decomp_findings : Output of decomposition_agent.run()
-    prov_findings   : Output of provenance_agent.run()
-    max_retries     : Additional attempts on JSON parse failure.
-
-    Returns
-    -------
-    Parsed arbiter report dict.
     """
     model = _get_model()
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -108,53 +62,63 @@ def run(decomp_findings: dict, prov_findings: dict, package_name: str = "Unknown
         decomp_findings, prov_findings
     )
 
+    d_count = len(decomp_findings.get("findings", []))
+    p_violations = prov_findings.get("findings", {}).get("violations", [])
+    p_count = len(p_violations)
+    
+    total_expected = d_count + p_count
+
     prompt = f"""You are the Arbiter Agent — the final authority — in the SovereignShield automated supply-chain inspection pipeline.
 
 MANDATE (NIST SP 800-218 Practice RV.1.3): Analyze all identified vulnerabilities and policy violations to determine risk and issue the definitive response.
 
-━━━ DECOMPOSITION AGENT FINDINGS ━━━
+━━━ INPUT DATA ━━━
+DECOMPOSITION FINDINGS ({d_count} items):
 {json.dumps(decomp_findings, indent=2)}
 
-━━━ PROVENANCE AGENT FINDINGS ━━━
+PROVENANCE VIOLATIONS ({p_count} items):
 {json.dumps(prov_findings, indent=2)}
 
-━━━ CONFIDENCE ASSESSMENT (AGENTIC FEEDBACK LOOP) ━━━
+━━━ CONFIDENCE ASSESSMENT ━━━
 {confidence_note}
 
-VERDICT RULES (apply strictly in this priority order):
-1. BLOCK if any confirmed threat has CRITICAL severity.
-2. BLOCK if total confirmed threats + policy violations >= 2.
-3. BLOCK if any low-confidence flag is present (preliminary verdict required).
-4. BLOCK if signature_status is MISMATCH or cert_status is EXPIRED.
-5. ALLOW only if: zero CRITICAL findings, zero policy violations, all confidence above threshold, valid signature, valid cert.
+STRICT OPERATIONAL RULES:
+1. **ABSOLUTE ITEMIZATION**: There are EXACTLY {total_expected} unique finding objects in the data above. You MUST produce EXACTLY {total_expected} entries in your `confirmed_threats` list.
+2. **NO SUMMARIZATION**: Every discrepancy from Decomposition and every violation from Provenance must be its own standalone record. Grouping is FORBIDDEN.
+3. **ZERO HALLUCINATION**: Use only IDs from the input or the standardized prefixes (`CVE-`, `SS-DISC-`, `SS-POL-`).
+4. **THOROUGHNESS**: Provide a specific justification for every single item.
 
-CRITICAL INSTRUCTION: You MUST compile EVERY SINGLE vulnerability, discrepancy, and policy violation found by the Decomposition Agent and Provenance Agent into your `confirmed_threats` array. Do NOT skip or filter out "LOW" or "MEDIUM" severity vulnerabilities; log all of them!
+WEIGHTED RISK SCORING:
+- CRITICAL severity finding         : 10 points
+- HIGH severity / Policy violation  : 5 points
+- MEDIUM severity finding           : 2 points
+- LOW severity / DISC finding       : 1 point
 
-Current UTC timestamp: {now_utc}
-
-Respond with ONLY valid JSON — no prose, no markdown fences — in this exact schema:
+Respond with ONLY valid JSON — no prose, no markdown — in this exact schema:
 {{
   "report_title": "SovereignShield Customs Inspection Report",
   "package": "{package_name}",
   "vendor": "{vendor_name}",
   "inspection_timestamp": "{now_utc}",
+  "total_expected_findings": {total_expected},
+  "total_risk_score": <calculated integer sum>,
   "confirmed_threats": [
     {{
-      "threat_id": "<USE EXACT CVE ID (e.g., CVE-2021-3807) OR EXACT POLICY CODE (e.g. SIG-MISMATCH). DO NOT USE T-XXX>",
+      "threat_id": "<SS-DISC-..., SS-POL-..., or CVE-...>",
       "source_agent": "<DecompositionAgent|ProvenanceAgent>",
-      "description": "<clear, concise threat description>",
+      "description": "<specific justification for this item>",
       "severity": "<CRITICAL|HIGH|MEDIUM|LOW>",
-      "nist_reference": "<NIST SP 800-218 practice code, e.g. PO.1.1>"
+      "nist_reference": "<PO.1.1|PO.3.2|RV.1.3>"
     }}
   ],
-  "low_confidence_flags": {json.dumps(low_confidence_flags)},
-  "total_violations": <integer — count of confirmed_threats>,
+  "total_violations": <integer count equal to total_expected_findings>,
   "verdict": "<BLOCK|ALLOW>",
-  "verdict_rationale": "<two to three sentences explaining exactly why this verdict was reached, citing specific threat IDs and policy codes>",
-  "recommended_action": "<one specific, actionable next step for the security team>"
+  "verdict_rationale": "<thorough risk breakdown citing the itemized score summation>",
+  "recommended_action": "<one specific actionable next step>"
 }}"""
 
     last_error: Exception | None = None
+    raw = ""
     for attempt in range(1 + max_retries):
         try:
             messages = [
@@ -166,7 +130,7 @@ Respond with ONLY valid JSON — no prose, no markdown fences — in this exact 
             ]
             response = model.chat(messages=messages)
             raw = response["choices"][0]["message"]["content"]
-            result = _extract_json(raw)
+            result = utils.extract_json(raw)
             # Ensure the pre-computed flags are preserved even if the model omits them
             if not result.get("low_confidence_flags"):
                 result["low_confidence_flags"] = low_confidence_flags
@@ -174,8 +138,9 @@ Respond with ONLY valid JSON — no prose, no markdown fences — in this exact 
         except (ValueError, json.JSONDecodeError) as exc:
             last_error = exc
             if attempt < max_retries:
-                print(f"  [ArbiterAgent] JSON parse error (attempt {attempt + 1}), retrying...")
+                ui.print_warn(f"[ArbiterAgent] JSON parse error (attempt {attempt + 1}), retrying...")
 
+    ui.print_error(f"[ArbiterAgent] RAW MODEL RESPONSE:\n{raw[:2000]}")
     raise RuntimeError(
         f"ArbiterAgent failed to return valid JSON after {1 + max_retries} attempts. "
         f"Last error: {last_error}"

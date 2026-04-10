@@ -10,6 +10,7 @@ Or via the convenience launcher:
     python run.py
 """
 
+import base64
 import json
 import os
 import sys
@@ -23,6 +24,7 @@ from .agents import decomposition_agent, provenance_agent, arbiter_agent
 PROJECT_ROOT = Path(__file__).parent.parent
 MOCK_DIR = PROJECT_ROOT / "data" / "mock_payloads"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "reports"
+ASSETS_DIR = PROJECT_ROOT / "data" / "assets"
 
 
 # ── Terminal formatting helpers ────────────────────────────────────────────────
@@ -83,11 +85,26 @@ def print_warn(msg: str):
     print(f"  {_c(YELLOW, '⚠')} {msg}")
 
 
+def _get_base64_logo() -> str:
+    """Read the logo file and return a base64 data URI."""
+    logo_path = ASSETS_DIR / "sovereignshield_logo.png"
+    if not logo_path.exists():
+        return ""
+    with open(logo_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
+
+
 # ── Report writers ─────────────────────────────────────────────────────────────
 
-def write_text_report(arbiter: dict, decomp: dict, prov: dict):
+def write_text_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     verdict = arbiter.get("verdict", "UNKNOWN")
+    pkg_name = arbiter.get('package', 'UnknownApp').replace(' ', '_')
+
+    # Sort findings by severity: Critical > High > Medium > Low
+    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
+    findings = sorted(arbiter.get("confirmed_threats", []), key=lambda x: sev_order.get(x.get("severity", "UNKNOWN").upper(), 4))
 
     lines = [
         "=" * 68,
@@ -102,7 +119,7 @@ def write_text_report(arbiter: dict, decomp: dict, prov: dict):
         "  CONFIRMED THREATS",
         "-" * 68,
     ]
-    for threat in arbiter.get("confirmed_threats", []):
+    for threat in findings:
         lines.append(
             f"  [{threat['threat_id']}] {threat['severity']:<8} | "
             f"{threat['source_agent']:<22} | {threat['nist_reference']}"
@@ -147,19 +164,25 @@ def write_text_report(arbiter: dict, decomp: dict, prov: dict):
         "=" * 68,
     ]
 
-    out_path = OUTPUT_DIR / "inspection_report.txt"
+    pkg_dir = OUTPUT_DIR / pkg_name
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    out_path = pkg_dir / f"{pkg_name}_{ts_str}.txt"
+    
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     print_ok(f"Text report written  → {out_path}")
 
 
-def write_html_report(arbiter: dict, decomp: dict, prov: dict):
+def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     verdict = arbiter.get("verdict", "UNKNOWN")
     is_block = (verdict == "BLOCK")
     v_color = "#d93025" if is_block else "#1e8e3e"
     v_bg = "rgba(217, 48, 37, 0.08)" if is_block else "rgba(30, 142, 62, 0.08)"
     v_icon = "🚫" if is_block else "✅"
-    
+    pkg_name = arbiter.get('package', 'UnknownApp').replace(' ', '_')
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    logo_base64 = _get_base64_logo()
+
     # Calculate System Composite Confidence Score
     c1 = decomp.get('overall_confidence', 0)
     c2 = prov.get('overall_confidence', 0)
@@ -171,6 +194,25 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
         s = t.get("severity", "MEDIUM").upper()
         if s in sev_counts:
             sev_counts[s] += 1
+
+    # Calculate counts and labels for the chart
+    sev_labels = [
+        f"Critical ({sev_counts['CRITICAL']})",
+        f"High ({sev_counts['HIGH']})",
+        f"Medium ({sev_counts['MEDIUM']})",
+        f"Low ({sev_counts['LOW']})"
+    ]
+
+    # Filter chips HTML
+    filters_html = f"""
+    <div style="display:flex; gap:12px; margin-bottom:24px;" class="animate-in" style="animation-delay: 0.35s;">
+      <button class="filter-chip active" onclick="filterTable('ALL', this)">All</button>
+      <button class="filter-chip" onclick="filterTable('CRITICAL', this)" style="--c:#d93025">Critical</button>
+      <button class="filter-chip" onclick="filterTable('HIGH', this)" style="--c:#e67c73">High</button>
+      <button class="filter-chip" onclick="filterTable('MEDIUM', this)" style="--c:#f29900">Medium</button>
+      <button class="filter-chip" onclick="filterTable('LOW', this)" style="--c:#1e8e3e">Low</button>
+    </div>
+    """
 
     def severity_badge(sev: str) -> str:
         colors = {
@@ -202,20 +244,31 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
 
     prov_findings = prov.get("findings", {})
     threats_rows = ""
-    for idx, t in enumerate(arbiter.get("confirmed_threats", [])):
+    
+    # Sort findings by severity: Critical > High > Medium > Low
+    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
+    sorted_threats = sorted(arbiter.get("confirmed_threats", []), key=lambda x: sev_order.get(x.get("severity", "UNKNOWN").upper(), 4))
+
+    for idx, t in enumerate(sorted_threats):
         tid = t.get('threat_id', 'UNKNOWN')
+        t_sev = t.get('severity', 'UNKNOWN').upper()
+        
+        # Metadata Styles
+        meta_style = "font-size:0.85em; font-weight:800; text-transform:uppercase; color:var(--muted);"
+        
         if "CVE-" in tid.upper():
-            tid_html = f'<a href="https://nvd.nist.gov/vuln/detail/{tid}" target="_blank" style="color:#d93025;text-decoration:none;font-weight:700;border-bottom:2px solid rgba(217, 48, 37, 0.2); transition: border-color 0.2s;">{tid}</a>'
+            tid_html = f'<a href="https://nvd.nist.gov/vuln/detail/{tid}" target="_blank" style="color:#d93025; text-decoration:none; {meta_style}">{tid}</a>'
         else:
             tid_html = f'<code>{tid}</code>'
             
         threats_rows += (
-            f'<tr style="animation: fadeInUp 0.4s ease forwards; animation-delay: {0.5 + (idx * 0.08)}s; opacity:0;">'
-            f"<td>{tid_html}</td>"
-            f"<td><span style='color:#5f6368;font-size:0.85em;font-weight:600;text-transform:uppercase;'>{t['source_agent']}</span></td>"
+            f'<tr class="threat-row" data-severity="{t_sev}" id="row-{idx}" style="animation: fadeInUp 0.4s ease forwards; animation-delay: {0.5 + (idx * 0.08)}s; opacity:0;">'
+            f'<td style="width:50px; text-align:center;"><input type="checkbox" class="fixed-check" onchange="toggleFixed({idx}, this)"></td>'
+            f'<td>{tid_html}</td>'
+            f'<td><span style="{meta_style}">{t["source_agent"]}</span></td>'
             f"<td>{severity_badge(t['severity'])}</td>"
-            f"<td style='line-height:1.6;color:#3c4043; font-weight:500;'>{t['description']}</td>"
-            f"<td><span style='background:rgba(26, 115, 232, 0.1);color:#1a73e8;padding:6px 12px;border-radius:6px;font-size:0.85em;font-family:\"JetBrains Mono\", monospace; font-weight:600;'>{t['nist_reference']}</span></td>"
+            f"<td style='line-height:1.6;color:#3c4043; font-weight:500;' class='desc-col'>{t['description']}</td>"
+            f'<td><code>{t["nist_reference"]}</code></td>'
             f"</tr>"
         )
 
@@ -330,10 +383,16 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
       text-transform: uppercase; color: var(--muted); font-weight: 900;
       border-bottom: 3px solid var(--border);
     }}
-    td {{ padding: 22px 20px; border-bottom: 1px solid var(--border); font-size: 1em; transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1); }}
+    td {{ padding: 26px 20px; border-bottom: 1px solid var(--border); font-size: 1em; transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1); }}
     tr:last-child td {{ border-bottom: none; }}
     tr:hover td {{ background: rgba(26, 115, 232, 0.07); transform: translateX(8px); }}
-    code {{ font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.05); padding: 5px 10px; border-radius: 8px; font-size: 0.95em; font-weight: 600; }}
+    code {{ 
+      font-family: 'JetBrains Mono', monospace; background: rgba(26, 115, 232, 0.07); 
+      padding: 4px 10px; border-radius: 6px; font-size: 0.85em; font-weight: 600;
+      display: inline-block; margin: 2px 0; color: var(--accent);
+      border: 1px solid rgba(26, 115, 232, 0.1); text-transform: uppercase;
+    }}
+    .tid-col {{ min-width: 240px; }}
 
     .action-box {{
       margin-top: 32px; padding: 28px; border-radius: 16px;
@@ -343,6 +402,32 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
     .action-box:hover {{ background: rgba(26, 115, 232, 0.15); }}
     .action-label {{ font-size: 0.85em; text-transform: uppercase; font-weight: 900; color: var(--accent); margin-bottom: 12px; letter-spacing: 0.1em; }}
     
+    .filter-chip {{
+      padding: 10px 22px; border-radius: 30px; border: 1px solid var(--border);
+      background: var(--glass); color: var(--muted); cursor: pointer;
+      font-size: 0.85em; font-weight: 800; text-transform: uppercase;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      letter-spacing: 0.05em;
+    }}
+    .filter-chip:hover {{ transform: translateY(-3px); border-color: var(--accent); color: var(--accent); }}
+    .filter-chip.active {{
+      background: var(--accent); color: white; border-color: var(--accent);
+      box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
+    }}
+    .filter-chip.active[style*="--c"] {{
+      background: var(--c); border-color: var(--c);
+      box-shadow: 0 4px 12px var(--c);
+    }}
+
+    .threat-row.is-fixed {{ opacity: 0.4; filter: grayscale(0.8); }}
+    .threat-row.is-fixed .desc-col {{ text-decoration: line-through; }}
+    
+    .fixed-check {{
+      width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent);
+      transition: transform 0.2s ease;
+    }}
+    .fixed-check:hover {{ transform: scale(1.2); }}
+
     .chart-container {{ height: 320px; position: relative; padding: 15px; overflow: visible; }}
 
     footer {{
@@ -355,7 +440,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
 <div class="container">
 
   <header class="header animate-in">
-    <img src="../assets/sovereignshield_logo.png" alt="SovereignShield Logo" class="shield-logo">
+    <img src="{logo_base64}" alt="SovereignShield Logo" class="shield-logo">
     <div>
       <h1>SovereignShield</h1>
       <div class="subtitle">Customs Inspection Report &bull; Strategic Supply-Chain Defense Dashboard</div>
@@ -426,14 +511,17 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
       </div>
     </div>
 
+    {filters_html}
+
     <table>
       <thead>
         <tr>
-          <th>Target ID</th><th>Discovery Agent</th><th>Severity</th><th>Description</th><th>NIST Clause</th>
+          <th style="width:50px; text-align:center;">Status</th>
+          <th style="width:240px;">Target ID</th><th>Discovery Agent</th><th>Severity</th><th>Description</th><th>NIST Clause</th>
         </tr>
       </thead>
       <tbody>
-        {threats_rows if threats_rows else "<tr><td colspan='5' style='text-align:center; padding: 70px; color: var(--muted); font-weight: 700; font-size: 1.1em;'>Clean Sweep: No vulnerabilities identified.</td></tr>"}
+        {threats_rows if threats_rows else "<tr><td colspan='6' style='text-align:center; padding: 70px; color: var(--muted); font-weight: 700; font-size: 1.1em;'>Clean Sweep: No vulnerabilities identified.</td></tr>"}
       </tbody>
     </table>
   </div>
@@ -448,7 +536,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
   new Chart(ctx, {{
     type: 'doughnut',
     data: {{
-      labels: ['Critical', 'High', 'Medium', 'Low'],
+      labels: {json.dumps(sev_labels)},
       datasets: [{{
         data: [{sev_counts['CRITICAL']}, {sev_counts['HIGH']}, {sev_counts['MEDIUM']}, {sev_counts['LOW']}],
         backgroundColor: ['#b31412', '#d93025', '#f29900', '#1e8e3e'],
@@ -459,20 +547,12 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
     options: {{
       responsive: true,
       maintainAspectRatio: false,
-      layout: {{
-        padding: {{
-          left: 10,
-          right: 30,
-          top: 30,
-          bottom: 30
-        }}
-      }},
+      layout: {{ padding: {{ left: 10, right: 30, top: 30, bottom: 30 }} }},
       plugins: {{
         legend: {{ 
           position: 'right', 
           labels: {{ 
-            usePointStyle: true, 
-            padding: 25,
+            usePointStyle: true, padding: 25,
             font: {{ size: 16, weight: '800', family: "'Inter', sans-serif" }},
             color: '#1a1b1e'
           }} 
@@ -483,19 +563,54 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict):
           padding: 16,
           titleFont: {{ size: 16, weight: '900' }},
           bodyFont: {{ size: 14, weight: '700' }},
-          cornerRadius: 12,
-          displayColors: true,
-          boxPadding: 8
+          cornerRadius: 12, displayColors: true, boxPadding: 8
         }}
-      }},
-      cutout: '74%'
+      }}
     }}
   }});
+
+  function filterTable(severity, btn) {{
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    document.querySelectorAll('.threat-row').forEach(row => {{
+      if (severity === 'ALL' || row.dataset.severity === severity) {{
+        row.style.display = 'table-row';
+      }} else {{
+        row.style.display = 'none';
+      }}
+    }});
+  }}
+
+  function toggleFixed(idx, check) {{
+    const row = document.getElementById('row-' + idx);
+    if (check.checked) {{
+      row.classList.add('is-fixed');
+      localStorage.setItem('ss-fixed-' + idx, 'true');
+    }} else {{
+      row.classList.remove('is-fixed');
+      localStorage.removeItem('ss-fixed-' + idx);
+    }}
+  }}
+
+  // Persistence on load
+  window.onload = () => {{
+    document.querySelectorAll('.fixed-check').forEach((check, idx) => {{
+      if (localStorage.getItem('ss-fixed-' + idx)) {{
+        check.checked = true;
+        const row = document.getElementById('row-' + idx);
+        if (row) row.classList.add('is-fixed');
+      }}
+    }});
+  }};
 </script>
 </body>
 </html>"""
 
-    out_path = OUTPUT_DIR / "inspection_report.html"
+    pkg_dir = OUTPUT_DIR / pkg_name
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    out_path = pkg_dir / f"{pkg_name}_{ts_str}.html"
+    
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print_ok(f"HTML report written  → {out_path}")
@@ -623,8 +738,9 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
 
     # ── Phase 6: Generate output reports ─────────────────────────────────────
     print_section("GENERATING INSPECTION REPORTS", phase=6)
-    write_text_report(arbiter_result, decomp_result, prov_result)
-    write_html_report(arbiter_result, decomp_result, prov_result)
+    ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    write_text_report(arbiter_result, decomp_result, prov_result, ts_str)
+    write_html_report(arbiter_result, decomp_result, prov_result, ts_str)
 
     # ── Final verdict ─────────────────────────────────────────────────────────
     verdict = arbiter_result.get("verdict", "UNKNOWN")

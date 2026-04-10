@@ -1,24 +1,14 @@
-"""
-agents/provenance_agent.py
-───────────────────────────
-NIST SP 800-218 — Practice PO.3.2
-"Verify the provenance and integrity of third-party components."
-
-This agent reads the software update metadata (compile origin, timestamps,
-digital signature hashes, code signing certificate status) and cross-
-references it against the plain-text Zero-Trust geographic routing policy.
-
-It identifies every violated policy clause by code (ZTP-GEO-XXX), assigns
-severity to each violation, and returns a confidence-scored compliance verdict.
-"""
-
 import json
-import re
 import sys
 from pathlib import Path
 
+# Allow running this file directly for isolated testing
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from watsonx_client import get_model
+
+from .. import config
+from .. import ui
+from .. import utils
+from ..watsonx_client import get_model
 
 _model = None
 
@@ -30,40 +20,9 @@ def _get_model():
     return _model
 
 
-def _extract_json(raw: str) -> dict:
-    text = raw.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    fence_match = re.search(r"```(?:json)?\s*([\s\S]+?)```", text)
-    if fence_match:
-        try:
-            return json.loads(fence_match.group(1).strip())
-        except json.JSONDecodeError:
-            pass
-    brace_match = re.search(r"\{[\s\S]+\}", text)
-    if brace_match:
-        try:
-            return json.loads(brace_match.group(0))
-        except json.JSONDecodeError:
-            pass
-    raise ValueError(f"Could not extract valid JSON from model response:\n{raw[:500]}")
-
-
-def run(metadata: dict, policy: str, max_retries: int = 2) -> dict:
+def run(metadata: dict, policy: str, max_retries: int = config.MAX_RETRIES) -> dict:
     """
     Invoke the Provenance Agent and return its compliance verdict.
-
-    Parameters
-    ----------
-    metadata    : Contents of update_metadata.json
-    policy      : Full text of zero_trust_policy.txt
-    max_retries : Additional attempts on JSON parse failure.
-
-    Returns
-    -------
-    Parsed agent findings dict.
     """
     model = _get_model()
 
@@ -78,40 +37,36 @@ MANDATE (NIST SP 800-218 Practice PO.3.2): Verify the provenance and integrity o
 {policy}
 
 TASK:
-1. Read every field in the metadata carefully.
-2. Compare each field against EVERY policy clause (ZTP-GEO-001 through ZTP-GEO-006).
-3. For each violated clause, record the exact policy code and the specific metadata field that triggered it.
-4. Determine signature status: VERIFIED / UNVERIFIED / MISMATCH.
-5. Determine certificate status: VALID / EXPIRED / MISSING.
+1. Compare every metadata field against EVERY ZTP-GEO policy clause.
+2. **MISSING DATA IS A VIOLATION**: If metadata is empty or missing, you MUST record violations for `SS-POL-SIG-UNVERIFIED` and `SS-POL-CERT-MISSING`.
+3. **MANDATORY ITEMIZATION**: Report Signature status, Certificate status, and Origin violations as SEPARATE objects in the `violations` array.
+4. **DO NOT SUMMARIZE**: Each issue must be its own record. 
+5. If metadata is provided but the signature field is missing/invalid, log a violation.
 
-SCORING RULES:
-- Confidence 0.90–1.0 : Explicit hash mismatches, expired certs, or known-restricted compile origin confirmed.
-- Confidence 0.75–0.89: Geographic violations only (no hash or cert issues found).
-- Confidence below 0.75: Ambiguous or contradictory metadata.
-
-Respond with ONLY valid JSON — no prose, no markdown fences — in this exact schema:
+Respond with ONLY valid JSON — no prose, no markdown — in this exact schema:
 {{
   "agent": "ProvenanceAgent",
   "findings": {{
-    "compile_origin": "<value from metadata>",
+    "compile_origin": "<value or 'UNKNOWN'>",
     "violations": [
       {{
-        "policy_code": "<ZTP-GEO-XXX>",
-        "triggering_field": "<metadata field name>",
-        "triggering_value": "<metadata field value>",
-        "violation_detail": "<specific explanation of what was violated>",
+        "policy_code": "<SS-POL-SIG-UNVERIFIED|SS-POL-CERT-MISSING|ZTP-GEO-XXX>",
+        "triggering_field": "<field name>",
+        "triggering_value": "<field value>",
+        "violation_detail": "<specific explanation>",
         "severity": "<CRITICAL|HIGH|MEDIUM>"
       }}
     ],
     "signature_status": "<VERIFIED|UNVERIFIED|MISMATCH>",
     "cert_status": "<VALID|EXPIRED|MISSING>",
     "confidence": <float 0.0–1.0>,
-    "summary": "<two sentences: overall provenance assessment>"
+    "summary": "<two sentences assessment>"
   }},
   "overall_confidence": <float 0.0–1.0>
 }}"""
 
     last_error: Exception | None = None
+    raw = ""
     for attempt in range(1 + max_retries):
         try:
             messages = [
@@ -123,12 +78,13 @@ Respond with ONLY valid JSON — no prose, no markdown fences — in this exact 
             ]
             response = model.chat(messages=messages)
             raw = response["choices"][0]["message"]["content"]
-            return _extract_json(raw)
+            return utils.extract_json(raw)
         except (ValueError, json.JSONDecodeError) as exc:
             last_error = exc
             if attempt < max_retries:
-                print(f"  [ProvenanceAgent] JSON parse error (attempt {attempt + 1}), retrying...")
+                ui.print_warn(f"[ProvenanceAgent] JSON parse error (attempt {attempt + 1}), retrying...")
 
+    ui.print_error(f"[ProvenanceAgent] RAW MODEL RESPONSE:\n{raw[:2000]}")
     raise RuntimeError(
         f"ProvenanceAgent failed to return valid JSON after {1 + max_retries} attempts. "
         f"Last error: {last_error}"

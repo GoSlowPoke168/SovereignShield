@@ -1,40 +1,21 @@
-"""
-preprocessor.py
-───────────────
-Pure-Python data preparation layer.
-
-All heavy lifting (parsing, diffing, CVE cross-referencing) happens here
-BEFORE any LLM call.  This keeps the prompts short, factual, and token-efficient:
-the agent's prompt contains only the computed findings, never raw JSON blobs.
-"""
-
 import json
 from pathlib import Path
 
+from . import config
 from .vulnerability_fetcher import search_vulnerabilities
-
-
-# ── I/O helpers ────────────────────────────────────────────────────────────────
 
 def load_json(path: str | Path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def load_text(path: str | Path) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
-
-
-# ── SBOM diff ──────────────────────────────────────────────────────────────────
 
 def compute_sbom_diff(vendor: dict, deep_scan: dict) -> dict:
     """
     Compute the structural difference between the vendor-declared SBOM
     and the independently deep-scanned SBOM.
-
-    Returns a structured summary rather than raw sets so that the LLM
-    prompt stays small and the logic stays in Python (not in the model).
     """
     vendor_deps: dict[str, str] = {
         d["name"]: d["version"]
@@ -73,21 +54,18 @@ def compute_sbom_diff(vendor: dict, deep_scan: dict) -> dict:
         "version_drift_count": len(version_drift),
     }
 
-
-# ── CVE cross-reference ────────────────────────────────────────────────────────
-
 def cross_reference_cves(diff: dict) -> list[dict]:
     """
     Match every hidden dependency against the live ExploitDB database.
     """
     matches: list[dict] = []
     
-    # Limit to first 50 dependencies to avoid hanging on massive files (e.g. 500MB Jars)
-    hidden_deps = diff.get("hidden_dependencies", [])[:50]
+    # Limit hidden deps to avoid hanging on massive files
+    hidden_deps = diff.get("hidden_dependencies", [])[:config.MAX_HIDDEN_DEPS_FOR_QUERY]
     
     for dep in hidden_deps:
         # Prevent token limit exceptions for the LLM
-        if len(matches) >= 10:
+        if len(matches) >= config.MAX_CVE_MATCHES:
             break
             
         package_name = dep["name"]

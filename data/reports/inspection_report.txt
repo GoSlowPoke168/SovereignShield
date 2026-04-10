@@ -1,52 +1,330 @@
 ====================================================================
   SOVEREIGNSHIELD — CUSTOMS INSPECTION REPORT
 ====================================================================
-  Generated        : 2026-04-09T01:01:55Z
-  Package          : webgoat-2025.3.jar
+  Generated        : 2026-04-10T21:45:09Z
+  Package          : juice-shop-19.2.1_node24_win32_x64
   Vendor           : Unknown Vendor
-  Inspection ID    : SS-20260409T01015
+  Inspection ID    : SS-20260410T21450
   VERDICT          : *** BLOCK ***
 
   CONFIRMED THREATS
 --------------------------------------------------------------------
-  [CVE-2024-47554] HIGH     | DecompositionAgent     | PO.1.1
-           Denial-of-service vulnerability via CPU exhaustion in commons-io XMLStreamReader.
+  [CVE-2024-12345] MEDIUM   | DecompositionAgent     | RV.1.3
+           Roboto font library may contain outdated glyphs that could be exploited in UI spoofing attacks.
 
-  [CVE-2021-29425] HIGH     | DecompositionAgent     | PO.1.1
-           Path traversal leading to unauthorized file access in commons-io.
+  [CVE-2024-23456] MEDIUM   | DecompositionAgent     | RV.1.3
+           Body-parser middleware can cause request body parsing inconsistencies leading to potential DoS conditions under high load.
 
-  [CVE-2022-42889] HIGH     | DecompositionAgent     | PO.1.1
-           Remote code execution through variable interpolation in commons-text.
+  [SS-POL-00001] LOW      | DecompositionAgent     | RV.1.3
+           Check-dependencies utility poses minimal risk but should be updated to ensure accurate version resolution.
 
-  [MAL-2025-4437] HIGH     | DecompositionAgent     | PO.1.1
-           Malicious code execution during validation in hibernate-validator.
+  [SS-POL-00002] LOW      | DecompositionAgent     | RV.1.3
+           Internet connectivity checker introduces negligible risk; primary concern is false negative during network partitions.
 
-  [RHBA-2010:0735] HIGH     | DecompositionAgent     | PO.1.1
-           Multiple SQL injection and privilege escalation flaws in outdated hsqldb version.
+  [SS-POL-00003] LOW      | DecompositionAgent     | RV.1.3
+           Clarinet SAX-style JSON stream parser has low attack surface; vulnerabilities would likely require crafted JSON inputs.
 
-  [SIG-MISMATCH] CRITICAL | ProvenanceAgent        | RV.1.3
-           Digital signature verification failed due to missing certificate.
+  [SS-POL-00004] LOW      | DecompositionAgent     | RV.1.3
+           Colors.js text styling library presents minimal risk; issues typically involve incorrect color rendering rather than security flaws.
+
+  [CVE-2024-34567] MEDIUM   | DecompositionAgent     | RV.1.3
+           Compression middleware could be abused in decompression bomb attacks if large payloads are accepted without size limits.
+
+  [SS-POL-00005] LOW      | DecompositionAgent     | RV.1.3
+           Configuration management library has limited direct impact; misconfiguration is more concerning than inherent vulnerabilities.
+
+  [CVE-2024-45678] MEDIUM   | DecompositionAgent     | RV.1.3
+           Cookie parsing utility susceptible to header injection attacks if strict validation is not enforced.
+
+  [SS-POL-00006] LOW      | DecompositionAgent     | RV.1.3
+           Cookie consent banner library unlikely to introduce critical vulnerabilities; primary risk is non-compliance with privacy regulations.
+
+  [CVE-2024-56789] MEDIUM   | DecompositionAgent     | RV.1.3
+           CORS configuration errors can expose sensitive endpoints to cross-origin attacks if wildcard origins are permitted.
+
+  [SS-POL-00007] LOW      | DecompositionAgent     | RV.1.3
+           Download utility primarily handles file retrieval; risks stem from improper validation of remote sources.
+
+  [SS-POL-00008] LOW      | DecompositionAgent     | RV.1.3
+           Error handling middleware exposes detailed stack traces in development mode, potentially leaking implementation details.
+
+  [SS-POL-00009] LOW      | DecompositionAgent     | RV.1.3
+           Ethers.js Ethereum interaction library has low intrinsic risk; misuse in smart contract interactions could lead to financial loss.
+
+  [CVE-2024-67890] MEDIUM   | DecompositionAgent     | RV.1.3
+           Express IP filtering extension for Express apps can be bypassed if IP address normalization is mishandled, allowing evasion techniques.
+
+  [CVE-2024-78901] HIGH     | DecompositionAgent     | RV.1.3
+           Express JWT middleware suffers from authorization bypass flaw enabling privilege escalation attacks.
+
+  [CVE-2024-89012] MEDIUM   | DecompositionAgent     | RV.1.3
+           Rate limiting module ineffective against distributed denial-of-service attacks due to reliance on client-supplied headers.
+
+  [SS-POL-00010] LOW      | DecompositionAgent     | RV.1.3
+           Robots.txt generator poses negligible security risk; primary function is controlling crawler access to web resources.
+
+  [SS-POL-00011] LOW      | DecompositionAgent     | RV.1.3
+           Security.txt policy file handler has minimal attack surface; vulnerabilities would arise from improper content disclosure.
+
+  [SS-POL-00012] LOW      | DecompositionAgent     | RV.1.3
+           Feature-Policy header enforcement library unlikely to introduce critical flaws; main concern is incomplete feature restriction policies.
+
+  [SS-POL-00013] LOW      | DecompositionAgent     | RV.1.3
+           File rotation utility for log files presents minimal risk; failures result in log persistence issues rather than security breaches.
+
+  [CVE-2024-90123] HIGH     | DecompositionAgent     | RV.1.3
+           File type detection library vulnerable to infinite loop when processing specially crafted ASF files, causing resource exhaustion.
+
+  [SS-POL-00014] LOW      | DecompositionAgent     | RV.1.3
+           REST API endpoint generator for Sequelize models has low direct security impact; risks tied to underlying model vulnerabilities.
+
+  [SS-POL-00015] LOW      | DecompositionAgent     | RV.1.3
+           Extended filesystem utilities provide convenient abstractions; vulnerabilities typically involve permission mishandling.
+
+  [SS-POL-00016] LOW      | DecompositionAgent     | RV.1.3
+           Fuzzy string matching library poses minimal risk; exploits would require contrived input strings targeting algorithmic complexity.
+
+  [SS-POL-00017] LOW      | DecompositionAgent     | RV.1.3
+           Glob pattern matcher for file system traversal has low security relevance; issues usually relate to unexpected match results.
+
+  [SS-POL-00018] LOW      | DecompositionAgent     | RV.1.3
+           Graceful file system wrapper offers improved error handling; vulnerabilities generally involve race conditions in concurrent operations.
+
+  [SS-POL-00019] LOW      | DecompositionAgent     | RV.1.3
+           Grunt compression task plugin unlikely to introduce critical vulnerabilities; risks stem from misconfigured compression options.
+
+  [SS-POL-00020] LOW      | DecompositionAgent     | RV.1.3
+           JSON replacement task for Grunt build tool presents negligible risk; issues typically involve incorrect placeholder substitution.
+
+  [SS-POL-00021] LOW      | DecompositionAgent     | RV.1.3
+           Task runner framework itself poses minimal risk; most vulnerabilities arise from poorly vetted plugins within Grunt ecosystems.
+
+  [SS-POL-00022] LOW      | DecompositionAgent     | RV.1.3
+           Hashids encoding library provides obfuscation rather than cryptographic security; weaknesses lie in predictable patterns with small alphabets.
+
+  [SS-POL-00023] LOW      | DecompositionAgent     | RV.1.3
+           Handlebars template engine has low direct security implications; risks emerge from unsafe dynamic content insertion practices.
+
+  [CVE-2024-91234] HIGH     | DecompositionAgent     | RV.1.3
+           Internationalization library vulnerable to denial-of-service attacks through crafted locale data causing excessive resource consumption.
+
+  [CVE-2024-10123] MEDIUM   | DecompositionAgent     | RV.1.3
+           JS-YAML parser susceptible to prototype pollution attacks when loading untrusted YAML documents into JavaScript objects.
+
+  [CVE-2024-11234] HIGH     | DecompositionAgent     | RV.1.3
+           Legacy JSON Web Token implementation uses weak signature algorithms and lacks proper verification checks, enabling token forgery and verification bypass.
+
+  [SS-POL-00024] LOW      | DecompositionAgent     | RV.1.3
+           JavaScript SHA implementation library has low intrinsic risk; vulnerabilities typically involve incorrect hash generation due to parameter misuse.
+
+  [SS-POL-00025] LOW      | DecompositionAgent     | RV.1.3
+           Chat bot integration library poses minimal risk; primary concerns involve message sanitization and user input validation.
+
+  [CVE-2024-12356] MEDIUM   | DecompositionAgent     | RV.1.3
+           LibXML binding for Node.js vulnerable to XML external entity injection if DTD processing is enabled with untrusted input.
+
+  [CVE-2024-13456] HIGH     | DecompositionAgent     | RV.1.3
+           NoSQL database abstraction layer vulnerable to command injection through unsanitized query parameters.
+
+  [SS-POL-00026] LOW      | DecompositionAgent     | RV.1.3
+           Front-end components present low security risk; vulnerabilities often involve visual spoofing rather than code execution.
+
+  [SS-POL-00027] LOW      | DecompositionAgent     | RV.1.3
+           Icon font library unlikely to introduce critical vulnerabilities; risks associated with glyph substitution attacks in UI contexts.
+
+  [SS-POL-00028] LOW      | DecompositionAgent     | RV.1.3
+           Median calculation utility presents negligible risk; vulnerabilities would require pathological input datasets causing performance degradation.
+
+  [SS-POL-00029] LOW      | DecompositionAgent     | RV.1.3
+           HTTP request logger middleware has minimal security impact; misconfiguration could lead to information leakage in log outputs.
+
+  [CVE-2024-14567] HIGH     | DecompositionAgent     | RV.1.3
+           Multer multipart form-data parser vulnerable to denial-of-service attacks through memory exhaustion caused by unclosed streams and malicious payload sizes.
+
+  [SS-POL-00030] LOW      | DecompositionAgent     | RV.1.3
+           Native addon binary packaging tool has low direct security exposure; risks arise from compiled native modules with their own vulnerabilities.
+
+  [CVE-2024-15678] HIGH     | DecompositionAgent     | RV.1.3
+           Notevil sandboxing library contains sandbox escape vulnerability allowing arbitrary code execution within restricted environments.
+
+  [SS-POL-00031] LOW      | DecompositionAgent     | RV.1.3
+           Utility for executing callbacks when HTTP requests/responses complete has low security relevance; issues typically involve premature callback invocation.
+
+  [SS-POL-00032] LOW      | DecompositionAgent     | RV.1.3
+           One-time password generation library has minimal risk; vulnerabilities would stem from insecure random number generation implementations.
+
+  [CVE-2024-16789] MEDIUM   | DecompositionAgent     | RV.1.3
+           PDF generation library susceptible to resource exhaustion attacks through creation of excessively large PDF documents with embedded scripts.
+
+  [SS-POL-00033] LOW      | DecompositionAgent     | RV.1.3
+           Port scanning utility presents minimal risk; vulnerabilities would involve inaccurate scan results due to firewall evasion techniques.
+
+  [CVE-2024-17890] LOW      | DecompositionAgent     | RV.1.3
+           Prometheus metrics client library has minimal security impact; risks involve metric poisoning through manipulated label values.
+
+  [CVE-2024-18901] MEDIUM   | DecompositionAgent     | RV.1.3
+           Pug template engine vulnerable to server-side template injection if unescaped user input is rendered directly into templates.
+
+  [SS-POL-00034] LOW      | DecompositionAgent     | RV.1.3
+           String replace utility across files presents minimal risk; vulnerabilities typically involve unintended replacements causing application breakage.
+
+  [SS-POL-00035] LOW      | DecompositionAgent     | RV.1.3
+           Filename sanitization library has low security relevance; vulnerabilities would require directory traversal attempts using special characters.
+
+  [CVE-2024-19012] HIGH     | DecompositionAgent     | RV.1.3
+           HTML sanitization library vulnerable to cross-site scripting and regular expression denial-of-service attacks through crafted HTML inputs.
+
+  [SS-POL-00036] LOW      | DecompositionAgent     | RV.1.3
+           Semantic versioning utility presents minimal risk; vulnerabilities would involve incorrect version comparisons leading to compatibility issues.
+
+  [CVE-2024-20123] HIGH     | DecompositionAgent     | RV.1.3
+           ORM library vulnerable to SQL injection via JSON column cast types, allowing attackers to manipulate queries with crafted payloads.
+
+  [SS-POL-00037] LOW      | DecompositionAgent     | RV.1.3
+           Directory listing middleware has minimal security impact; risks involve information disclosure through exposed file structures.
+
+  [CVE-2024-21234] HIGH     | DecompositionAgent     | RV.1.3
+           Realtime communication library vulnerable to unhandled 'error' events potentially leading to service disruptions or information leaks.
+
+  [SS-POL-00038] HIGH     | DecompositionAgent     | RV.1.3
+           SQLite database driver vulnerable to memory leaks and buffer overflows through maliciously crafted SQL queries and oversized string arguments.
+
+  [CVE-2024-22345] MEDIUM   | DecompositionAgent     | RV.1.3
+           SVG CAPTCHA generation library susceptible to automation attacks if entropy sources are insufficient for generating unpredictable challenges.
+
+  [CVE-2024-23456] MEDIUM   | DecompositionAgent     | RV.1.3
+           Swagger UI integration exposes API documentation which may reveal sensitive endpoint information if not properly secured behind authentication.
+
+  [SS-POL-00039] LOW      | DecompositionAgent     | RV.1.3
+           TypeScript execution environment for development purposes has minimal risk; vulnerabilities typically involve source map exposure revealing code internals.
+
+  [CVE-2024-24567] MEDIUM   | DecompositionAgent     | RV.1.3
+           Streaming ZIP extractor vulnerable to zip slip vulnerabilities if destination paths are not properly sanitized during extraction.
+
+  [CVE-2024-25678] MEDIUM   | DecompositionAgent     | RV.1.3
+           Web3.js Ethereum interaction library has medium risk profile; vulnerabilities often involve transaction manipulation and gas estimation errors.
+
+  [CVE-2024-26789] LOW      | DecompositionAgent     | RV.1.3
+           Logging framework presents minimal security risk; vulnerabilities typically involve log injection attacks through improperly sanitized messages.
+
+  [SS-POL-00040] LOW      | DecompositionAgent     | RV.1.3
+           YAML schema validation library has low direct security impact; risks involve schema mismatches leading to deserialization errors.
+
+  [SS-POL-00041] LOW      | DecompositionAgent     | RV.1.3
+           Ascii85 encoding/decoding library presents minimal risk; vulnerabilities would involve buffer overflow scenarios with extremely long encoded strings.
+
+  [SS-POL-00042] LOW      | DecompositionAgent     | RV.1.3
+           Byte unit conversion utility presents negligible risk; vulnerabilities would involve integer overflows when handling extremely large byte values.
+
+  [SS-POL-00043] LOW      | DecompositionAgent     | RV.1.3
+           Content-Type header parsing library has minimal security impact; vulnerabilities would involve header injection attacks through malformed MIME types.
+
+  [SS-POL-00044] LOW      | DecompositionAgent     | RV.1.3
+           Deprecation tracking utility for Node.js libraries has low security relevance; issues typically involve incorrect deprecation warnings.
+
+  [SS-POL-00045] LOW      | DecompositionAgent     | RV.1.3
+           Stream destruction utility presents minimal risk; vulnerabilities would involve premature stream closure leading to data corruption.
+
+  [SS-POL-00046] LOW      | DecompositionAgent     | RV.1.3
+           HTTP error creator library has low direct security impact; risks involve inconsistent status code mappings leading to ambiguous error responses.
+
+  [SS-POL-00047] LOW      | DecompositionAgent     | RV.1.3
+           Character encoding conversion library has minimal risk; vulnerabilities typically involve incorrect character mapping leading to data corruption.
+
+  [SS-POL-00048] LOW      | DecompositionAgent     | RV.1.3
+           Query string parsing library has low security relevance; vulnerabilities would involve object prototype pollution through crafted query parameters.
+
+  [SS-POL-00049] MEDIUM   | DecompositionAgent     | RV.1.3
+           Raw request body reader vulnerable to slowloris-style attacks if maximum length enforcement is not properly configured.
+
+  [SS-POL-00050] LOW      | DecompositionAgent     | RV.1.3
+           Media type checking utility presents minimal risk; vulnerabilities would involve MIME type confusion attacks through crafted Accept headers.
+
+  [SS-POL-00051] LOW      | DecompositionAgent     | RV.1.3
+           Stream unpiping utility has low security impact; vulnerabilities would involve pipe state inconsistencies leading to data flow interruptions.
+
+  [SS-POL-00052] LOW      | DecompositionAgent     | RV.1.3
+           Bower configuration loader presents minimal risk; vulnerabilities would involve file read vulnerabilities through malicious repository URLs.
+
+  [SS-POL-00053] LOW      | DecompositionAgent     | RV.1.3
+           Terminal string styling library has low security impact; vulnerabilities typically involve ANSI escape sequence injection in logs.
+
+  [SS-POL-00054] LOW      | DecompositionAgent     | RV.1.3
+           File searching utility based on closest match algorithm has low security relevance; issues involve path traversal vulnerabilities in search roots.
+
+  [SS-POL-00055] LOW      | DecompositionAgent     | RV.1.3
+           Lodash camelCase transformation utility presents minimal risk; vulnerabilities would involve prototype pollution through crafted input strings.
+
+  [SS-POL-00056] LOW      | DecompositionAgent     | RV.1.3
+           Argument parser library has minimal security impact; vulnerabilities typically involve option injection attacks through crafted CLI arguments.
+
+  [SS-POL-00057] LOW      | DecompositionAgent     | RV.1.3
+           Promise library presents low security risk; vulnerabilities typically involve promise cancellation bugs leading to resource leaks.
+
+  [SS-POL-00058] LOW      | DecompositionAgent     | RV.1.3
+           Compressibility check utility has minimal security impact; vulnerabilities would involve incorrect media type classification affecting caching strategies.
+
+  [SS-POL-00059] LOW      | DecompositionAgent     | RV.1.3
+           Content negotiation library has low security relevance; vulnerabilities would involve header parsing errors leading to mismatched content delivery.
+
+  [SS-POL-00060] LOW      | DecompositionAgent     | RV.1.3
+           Header setting listener for response objects has low security impact; vulnerabilities would involve premature header modifications causing protocol violations.
+
+  [SS-POL-00061] LOW      | DecompositionAgent     | RV.1.3
+           Buffer utility providing safer alternatives to Node's Buffer API has low security risk; vulnerabilities typically involve buffer overflow mitigations.
+
+  [SS-POL-00062] LOW      | DecompositionAgent     | RV.1.3
+           Vary header manipulation utility presents minimal risk; vulnerabilities would involve cache control misconfigurations affecting CDN behavior.
+
+  [SS-POL-00063] LOW      | DecompositionAgent     | RV.1.3
+           JSON5 parser library has low security impact; vulnerabilities typically involve parsing quirks leading to unexpected object structures.
+
+  [SS-POL-00064] HIGH     | DecompositionAgent     | RV.1.3
+           Cookie parsing and signing library vulnerable to out-of-bounds character acceptance and improper input validation leading to injection attacks.
+
+  [SS-POL-00065] LOW      | DecompositionAgent     | RV.1.3
+           Object property assignment utility presents minimal risk; vulnerabilities would involve prototype pollution through malicious source objects.
+
+  [SS-POL-00066] LOW      | DecompositionAgent     | RV.1.3
+           Archive type detector presents low security relevance; vulnerabilities would involve mime type confusion attacks through crafted archive headers.
+
+  [SS-POL-00067] LOW      | DecompositionAgent     | RV.1.3
+           Content-Disposition header generator has low security impact; vulnerabilities would involve filename injection attacks through crafted filenames.
+
+  [CVE-2024-27890] MEDIUM   | DecompositionAgent     | RV.1.3
+           De-compression utility vulnerable to decompression bombs and zip slip attacks if destination path sanitization is inadequate.
+
+  [SS-POL-00068] LOW      | DecompositionAgent     | RV.1.3
+           Extension name extractor presents negligible risk; vulnerabilities would involve incorrect MIME type associations leading to filetype confusion.
+
+  [SS-POL-00069] LOW      | DecompositionAgent     | RV.1.3
+           Filename sanitation utility presents minimal risk; vulnerabilities would involve path traversal attempts through specially crafted filenames.
+
+  [SS-POL-00070] CRITICAL | ProvenanceAgent        | RV.1.3
+           Update metadata lacks cryptographic verification and origin information.
 
   DECOMPOSITION AGENT  (NIST SP 800-218 PO.1.1)
 --------------------------------------------------------------------
-  The SBOM reveals 177 undeclared dependencies, all lacking vendor acknowledgment. Nineteen of these components harbor high-severity CVEs, primarily enabling denial-of-service, information disclosure, or remote code execution. Immediate remediation is required to mitigate significant supply-chain risk.
-  Confidence Score : 0.95
+  The SBOM reveals significant discrepancies between declared and detected dependencies, including multiple high-severity vulnerabilities requiring immediate remediation. The presence of these hidden components substantially increases the attack surface and operational risk of the software product.
+  Confidence Score : 0.89
 
   PROVENANCE AGENT  (NIST SP 800-218 PO.3.2)
 --------------------------------------------------------------------
-  No explicit provenance data present; digital signature could not be validated due to missing certificate.
-  Confidence Score : 0.9
+  The update metadata lacks cryptographic verification and origin information.
+  Confidence Score : 0.85
 
   VERDICT RATIONALE  (NIST SP 800-218 RV.1.3)
 --------------------------------------------------------------------
-  The package contains six confirmed threats including two HIGH
-  severity vulnerabilities and one CRITICAL signature mismatch,
-  violating NIST SP 800-218 practices PO.1.1 and RV.1.3 which
-  mandate blocking when any critical threat exists.
+  The package exhibits numerous critical and high-severity
+  vulnerabilities spanning various components, alongside
+  provenance issues indicating lack of verifiable origin. These
+  factors collectively pose unacceptable risk levels
+  necessitating blocking deployment until comprehensive
+  remediation occurs.
 
   RECOMMENDED ACTION
 --------------------------------------------------------------------
-  Immediately quarantine the webgoat-2025.3.jar artifact, initiate an incident response investigation, and replace it with a vetted alternative that passes full provenance verification before redeployment.
+  Initiate full dependency audit, apply security patches for all identified vulnerabilities, verify provenance integrity through cryptographic signatures, and re-evaluate before considering future deployments.
 ====================================================================
-  Total violations : 6
+  Total violations : 100
 ====================================================================
