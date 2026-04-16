@@ -19,13 +19,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from .preprocessor import load_json, load_text, compute_sbom_diff, cross_reference_cves
 from .agents import decomposition_agent, provenance_agent, arbiter_agent
+from . import config
 
-# Use absolute paths relative to the project root
+# Paths anchor to CWD at runtime so the tool works regardless of where it is installed.
+# config.py uses __file__-relative paths for internal data; here we follow suit so that
+# running `python run.py` from any directory still writes reports next to the project files.
 PROJECT_ROOT = Path(__file__).parent.parent
-MOCK_DIR = PROJECT_ROOT / "data" / "mock_payloads"
-OUTPUT_DIR = PROJECT_ROOT / "data" / "reports"
-ASSETS_DIR = PROJECT_ROOT / "data" / "assets"
-
+OUTPUT_DIR   = PROJECT_ROOT / "data" / "reports"
+ASSETS_DIR   = PROJECT_ROOT / "data" / "assets"
 
 # ── Terminal formatting helpers ────────────────────────────────────────────────
 
@@ -97,83 +98,55 @@ def _get_base64_logo() -> str:
 
 # ── Report writers ─────────────────────────────────────────────────────────────
 
-def write_text_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    verdict = arbiter.get("verdict", "UNKNOWN")
+def write_json_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str, cve_matches: list[dict] = None):
+    """
+    Emit a machine-readable JSON report alongside the HTML.
+    Suitable for ingestion by SIEM tools, CI/CD gates, and other automated consumers.
+    Schema is stable across runs — use verdict, total_risk_score, and confirmed_threats.
+    """
     pkg_name = arbiter.get('package', 'UnknownApp').replace(' ', '_')
+    sev_dist = arbiter.get("severity_distribution", {})
 
-    # Sort findings by severity: Critical > High > Medium > Low
-    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
-    findings = sorted(arbiter.get("confirmed_threats", []), key=lambda x: sev_order.get(x.get("severity", "UNKNOWN").upper(), 4))
-
-    lines = [
-        "=" * 68,
-        "  SOVEREIGNSHIELD — CUSTOMS INSPECTION REPORT",
-        "=" * 68,
-        f"  Generated        : {timestamp}",
-        f"  Package          : {arbiter.get('package')}",
-        f"  Vendor           : {arbiter.get('vendor', 'N/A')}",
-        f"  Inspection ID    : SS-{timestamp.replace(':', '').replace('-', '')[:14]}",
-        f"  VERDICT          : *** {verdict} ***",
-        "",
-        "  CONFIRMED THREATS",
-        "-" * 68,
-    ]
-    for threat in findings:
-        lines.append(
-            f"  [{threat['threat_id']}] {threat['severity']:<8} | "
-            f"{threat['source_agent']:<22} | {threat['nist_reference']}"
-        )
-        lines.append(f"           {threat['description']}")
-        lines.append("")
-
-    flags = arbiter.get("low_confidence_flags", [])
-    if flags:
-        lines += ["  LOW-CONFIDENCE FLAGS (AGENTIC FEEDBACK LOOP)", "-" * 68]
-        for flag in flags:
-            wrapped = textwrap.fill(flag, width=64, initial_indent="  • ", subsequent_indent="    ")
-            lines.append(wrapped)
-        lines.append("")
-
-    lines += [
-        "  DECOMPOSITION AGENT  (NIST SP 800-218 PO.1.1)",
-        "-" * 68,
-        f"  {decomp.get('summary', 'No summary available.')}",
-        f"  Confidence Score : {decomp.get('overall_confidence', 'N/A')}",
-        "",
-        "  PROVENANCE AGENT  (NIST SP 800-218 PO.3.2)",
-        "-" * 68,
-        f"  {prov['findings'].get('summary', 'No summary available.')}",
-        f"  Confidence Score : {prov.get('overall_confidence', 'N/A')}",
-        "",
-        "  VERDICT RATIONALE  (NIST SP 800-218 RV.1.3)",
-        "-" * 68,
-    ]
-    rationale = textwrap.fill(
-        arbiter.get("verdict_rationale", ""), width=64,
-        initial_indent="  ", subsequent_indent="  "
-    )
-    lines.append(rationale)
-    lines += [
-        "",
-        "  RECOMMENDED ACTION",
-        "-" * 68,
-        f"  {arbiter.get('recommended_action', 'N/A')}",
-        "=" * 68,
-        f"  Total violations : {arbiter.get('total_violations', 0)}",
-        "=" * 68,
-    ]
+    # Build the canonical, parsable payload
+    payload = {
+        "schema_version": "1.0",
+        "tool": "SovereignShield",
+        "nist_alignment": "SP 800-218",
+        "generated_at": arbiter.get("inspection_timestamp", ts_str),
+        "package": arbiter.get("package"),
+        "vendor": arbiter.get("vendor"),
+        "verdict": arbiter.get("verdict"),
+        "total_risk_score": arbiter.get("total_risk_score"),
+        "verdict_rationale": arbiter.get("verdict_rationale"),
+        "recommended_action": arbiter.get("recommended_action"),
+        "severity_distribution": sev_dist,
+        "total_findings": arbiter.get("total_violations", 0),
+        "agent_confidence": {
+            "decomposition": decomp.get("overall_confidence"),
+            "provenance": prov.get("overall_confidence"),
+        },
+        "low_confidence_flags": arbiter.get("low_confidence_flags", []),
+        "confirmed_threats": [
+            {
+                "threat_id": t.get("threat_id"),
+                "source_agent": t.get("source_agent"),
+                "severity": t.get("severity"),
+                "cvss_score": t.get("cvss_score"),
+                "nist_reference": t.get("nist_reference"),
+                "description": t.get("description"),
+            }
+            for t in arbiter.get("confirmed_threats", [])
+        ],
+    }
 
     pkg_dir = OUTPUT_DIR / pkg_name
     pkg_dir.mkdir(parents=True, exist_ok=True)
-    out_path = pkg_dir / f"{pkg_name}_{ts_str}.txt"
-    
+    out_path = pkg_dir / f"{pkg_name}_{ts_str}.json"
     with open(out_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-    print_ok(f"Text report written  → {out_path}")
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    print_ok(f"JSON report written  → {out_path.relative_to(PROJECT_ROOT)}")
 
-
-def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
+def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str, cve_matches: list[dict] = None):
     verdict = arbiter.get("verdict", "UNKNOWN")
     is_block = (verdict == "BLOCK")
     v_color = "#d93025" if is_block else "#1e8e3e"
@@ -205,12 +178,82 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
 
     # Filter chips HTML
     filters_html = f"""
-    <div style="display:flex; gap:12px; margin-bottom:24px;" class="animate-in" style="animation-delay: 0.35s;">
-      <button class="filter-chip active" onclick="filterTable('ALL', this)">All</button>
-      <button class="filter-chip" onclick="filterTable('CRITICAL', this)" style="--c:#d93025">Critical</button>
-      <button class="filter-chip" onclick="filterTable('HIGH', this)" style="--c:#e67c73">High</button>
-      <button class="filter-chip" onclick="filterTable('MEDIUM', this)" style="--c:#f29900">Medium</button>
-      <button class="filter-chip" onclick="filterTable('LOW', this)" style="--c:#1e8e3e">Low</button>
+    <style>
+      .hide-cb-label {{
+        padding: 10px 22px; border-radius: 30px; border: 1px solid var(--border);
+        background: var(--glass); color: var(--muted); cursor: pointer;
+        display: flex; align-items: center; gap: 10px;
+        font-size: 0.85em; font-weight: 800; text-transform: uppercase;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        letter-spacing: 0.05em;
+      }}
+      .hide-cb-label:hover {{ transform: translateY(-3px); border-color: var(--accent); color: var(--accent); }}
+      .hide-cb-label:has(input:checked) {{
+        background: var(--accent); color: white; border-color: var(--accent);
+        box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
+      }}
+      .hide-cb-label:has(input:checked)[style*="--c"] {{
+        background: var(--c); border-color: var(--c);
+        box-shadow: 0 4px 12px var(--c);
+      }}
+      .hide-cb-label input {{ accent-color: white; width: 15px; height: 15px; cursor: pointer; }}
+
+      .agent-tooltip {{
+        cursor: help; 
+        border-bottom: 1px dotted var(--muted);
+        position: relative;
+        display: inline-block;
+      }}
+      .agent-tooltip::after {{
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 130%; left: 0;
+        width: 280px;
+        padding: 14px 18px;
+        background: rgba(26, 27, 30, 0.95);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        line-height: 1.5;
+        text-transform: none;
+        letter-spacing: normal;
+        border-radius: 10px;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        z-index: 100;
+      }}
+      .agent-tooltip:hover::after {{ opacity: 1; transform: translateY(0); }}
+    </style>
+    <div class="animate-in" style="animation-delay: 0.35s; display:flex; flex-direction:column; gap:16px; margin-bottom:24px;">
+      <div style="display:flex; gap:12px;">
+        <span style="font-size:0.85em;font-weight:900;text-transform:uppercase;color:var(--muted);align-self:center;margin-right:8px;">Show:</span>
+        <button class="filter-chip active" onclick="setSeverityFilter('ALL', this)">All</button>
+        <button class="filter-chip" onclick="setSeverityFilter('CRITICAL', this)" style="--c:#d93025">Critical</button>
+        <button class="filter-chip" onclick="setSeverityFilter('HIGH', this)" style="--c:#e67c73">High</button>
+        <button class="filter-chip" onclick="setSeverityFilter('MEDIUM', this)" style="--c:#f29900">Medium</button>
+        <button class="filter-chip" onclick="setSeverityFilter('LOW', this)" style="--c:#1e8e3e">Low</button>
+      </div>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <span style="font-size:0.85em;font-weight:900;text-transform:uppercase;color:var(--muted);margin-right:2px;">Hide:</span>
+        <label class="hide-cb-label" style="--c:#d93025">
+          <input type="checkbox" onchange="toggleHide('CRITICAL', this.checked)"> Critical
+        </label>
+        <label class="hide-cb-label" style="--c:#e67c73">
+          <input type="checkbox" onchange="toggleHide('HIGH', this.checked)"> High
+        </label>
+        <label class="hide-cb-label" style="--c:#f29900">
+          <input type="checkbox" onchange="toggleHide('MEDIUM', this.checked)"> Medium
+        </label>
+        <label class="hide-cb-label" style="--c:#1e8e3e">
+          <input type="checkbox" onchange="toggleHide('LOW', this.checked)"> Low
+        </label>
+        <label class="hide-cb-label" style="--c:#64748b">
+          <input type="checkbox" onchange="toggleHide('FIXED', this.checked)"> Checked (Fixed)
+        </label>
+      </div>
     </div>
     """
 
@@ -245,6 +288,13 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     prov_findings = prov.get("findings", {})
     threats_rows = ""
     
+    cve_exploit_map = {}
+    if cve_matches:
+        for cve in cve_matches:
+            cid = cve.get("cve_id")
+            if cid:
+                cve_exploit_map[cid] = cve.get("has_public_exploit", False)
+
     # Sort findings by severity: Critical > High > Medium > Low
     sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
     sorted_threats = sorted(arbiter.get("confirmed_threats", []), key=lambda x: sev_order.get(x.get("severity", "UNKNOWN").upper(), 4))
@@ -255,19 +305,48 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
         
         # Metadata Styles
         meta_style = "font-size:0.85em; font-weight:800; text-transform:uppercase; color:var(--muted);"
-        
-        if "CVE-" in tid.upper():
-            tid_html = f'<a href="https://nvd.nist.gov/vuln/detail/{tid}" target="_blank" style="color:#d93025; text-decoration:none; {meta_style}">{tid}</a>'
+
+        tid_upper = tid.upper()
+        db_links_html = ""
+        if "CVE-" in tid_upper and tid_upper.startswith("CVE-"):
+            tid_html = f'<span class="code-cve">{tid}</span>'
+            nvd_url  = f"https://nvd.nist.gov/vuln/detail/{tid}"
+            osv_url  = f"https://osv.dev/vulnerability/{tid}"
+            
+            db_links_html += f'<div class="db-links">'
+            db_links_html += f'<a class="db-link db-link-nvd" href="{nvd_url}" target="_blank" rel="noopener">NVD</a>'
+            db_links_html += f'<a class="db-link db-link-osv" href="{osv_url}" target="_blank" rel="noopener">OSV</a>'
+            
+            # Conditionally render ExploitDB only if we fetched a positive signal for it
+            if cve_exploit_map.get(tid, False):
+                edb_url = f"https://www.exploit-db.com/search?cve={tid}"
+                db_links_html += f'<a class="db-link db-link-edb" href="{edb_url}" target="_blank" rel="noopener">ExploitDB</a>'
+            
+            db_links_html += f'</div>'
+        elif tid_upper.startswith("GHSA-"):
+            tid_html = f'<span class="code-ghsa">{tid}</span>'
+            osv_url = f"https://osv.dev/vulnerability/{tid}"
+            gh_url  = f"https://github.com/advisories/{tid}"
+            db_links_html = (
+                f'<div class="db-links">'
+                f'<a class="db-link db-link-osv" href="{osv_url}" target="_blank" rel="noopener">OSV</a>'
+                f'<a class="db-link db-link-nvd" href="{gh_url}" target="_blank" rel="noopener">GitHub</a>'
+                f'</div>'
+            )
         else:
+            # SS-POL-*, SS-DISC-*, or any internal code — keep blue code badge
             tid_html = f'<code>{tid}</code>'
             
+        # Source Agent formatting for text wrap
+        source_agent_display = t.get("source_agent", "Unknown").replace("Agent", " Agent")
+
         threats_rows += (
             f'<tr class="threat-row" data-severity="{t_sev}" id="row-{idx}" style="animation: fadeInUp 0.4s ease forwards; animation-delay: {0.5 + (idx * 0.08)}s; opacity:0;">'
             f'<td style="width:50px; text-align:center;"><input type="checkbox" class="fixed-check" onchange="toggleFixed({idx}, this)"></td>'
-            f'<td>{tid_html}</td>'
-            f'<td><span style="{meta_style}">{t["source_agent"]}</span></td>'
+            f'<td><div style="font-weight:700; margin-bottom:6px;">{tid_html}</div>{db_links_html}</td>'
+            f'<td><span style="{meta_style}">{source_agent_display}</span></td>'
             f"<td>{severity_badge(t['severity'])}</td>"
-            f"<td style='line-height:1.6;color:#3c4043; font-weight:500;' class='desc-col'>{t['description']}</td>"
+            f"<td style='line-height:1.6;color:var(--text); font-weight:500;' class='desc-col'>{t['description']}</td>"
             f'<td><code>{t["nist_reference"]}</code></td>'
             f"</tr>"
         )
@@ -291,6 +370,11 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SovereignShield — Customs Inspection Report</title>
+  <script>
+    if (localStorage.getItem('ss-theme') === 'dark') {{
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }}
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -303,6 +387,17 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
       --muted: #64748b;
       --accent: #1a73e8;
       --shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+      --inner-bg: rgba(0, 0, 0, 0.04);
+    }}
+    :root[data-theme="dark"] {{
+      --bg: #0f1115;
+      --glass: rgba(20, 22, 28, 0.82);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      --inner-bg: rgba(255, 255, 255, 0.03);
     }}
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
@@ -314,6 +409,10 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
       padding: 60px 20px;
       min-height: 100vh;
       line-height: 1.6;
+    }}
+    :root[data-theme="dark"] body {{
+      background: radial-gradient(circle at top right, #1a1c23, #0f1115 40%),
+                  radial-gradient(circle at bottom left, #14161b, #0f1115 40%);
     }}
     .container {{ max-width: 1140px; margin: 0 auto; }}
 
@@ -346,7 +445,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     .header {{ display: flex; align-items: center; gap: 28px; margin-bottom: 40px; }}
     .shield-logo {{ width: 72px; height: 72px; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.2)); transition: transform 0.6s ease; }}
     .shield-logo:hover {{ transform: rotate(15deg) scale(1.15); }}
-    h1 {{ font-size: 2.5em; font-weight: 900; color: #1a1b1e; letter-spacing: -0.04em; }}
+    h1 {{ font-size: 2.5em; font-weight: 900; color: var(--text); letter-spacing: -0.04em; }}
     .subtitle {{ color: var(--muted); font-size: 1.05em; font-weight: 500; margin-top: 4px; }}
 
     .meta-bar {{
@@ -392,7 +491,40 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
       display: inline-block; margin: 2px 0; color: var(--accent);
       border: 1px solid rgba(26, 115, 232, 0.1); text-transform: uppercase;
     }}
-    .tid-col {{ min-width: 240px; }}
+    /* CVE badge — red tint, same geometry as blue code but danger-coloured */
+    .code-cve {{
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(217, 48, 37, 0.08);
+      padding: 4px 10px; border-radius: 6px; font-size: 0.85em; font-weight: 700;
+      display: inline-block; margin: 2px 0; color: #d93025;
+      border: 1px solid rgba(217, 48, 37, 0.22); text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }}
+    /* GHSA badge — amber tint for open-source advisories */
+    .code-ghsa {{
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(242, 153, 0, 0.09);
+      padding: 4px 10px; border-radius: 6px; font-size: 0.85em; font-weight: 700;
+      display: inline-block; margin: 2px 0; color: #c77b00;
+      border: 1px solid rgba(242, 153, 0, 0.25); text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }}
+    /* small icon links next to CVE/GHSA badges */
+    .db-links {{ display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }}
+    .db-link {{
+      display: inline-flex; align-items: center; gap: 4px;
+      font-family: 'Inter', sans-serif; font-size: 0.72em; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 3px 8px; border-radius: 4px; text-decoration: none;
+      transition: all 0.2s ease; border: 1px solid;
+    }}
+    .db-link-nvd  {{ color: #1a73e8; border-color: rgba(26,115,232,0.3); background: rgba(26,115,232,0.06); }}
+    .db-link-nvd:hover  {{ background: rgba(26,115,232,0.14); transform: translateY(-1px); }}
+    .db-link-edb  {{ color: #d93025; border-color: rgba(217,48,37,0.3);  background: rgba(217,48,37,0.06); }}
+    .db-link-edb:hover  {{ background: rgba(217,48,37,0.14); transform: translateY(-1px); }}
+    .db-link-osv  {{ color: #1e8e3e; border-color: rgba(30,142,62,0.3);  background: rgba(30,142,62,0.06); }}
+    .db-link-osv:hover  {{ background: rgba(30,142,62,0.14); transform: translateY(-1px); }}
+    .tid-col {{ min-width: 260px; }}
 
     .action-box {{
       margin-top: 32px; padding: 28px; border-radius: 16px;
@@ -445,6 +577,9 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
       <h1>SovereignShield</h1>
       <div class="subtitle">Customs Inspection Report &bull; Strategic Supply-Chain Defense Dashboard</div>
     </div>
+    <button id="themeToggle" style="margin-left:auto; padding:10px 18px; border-radius:30px; border:1px solid var(--border); background:var(--glass); color:var(--text); cursor:pointer; font-weight:800; font-size:0.9em; box-shadow:var(--shadow); transition:all 0.3s; display:flex; align-items:center; gap:8px;">
+      🌓 <span style="opacity: 0.8;">Toggle Dark</span>
+    </button>
   </header>
 
   <div class="meta-bar glass animate-in" style="animation-delay: 0.1s;">
@@ -496,14 +631,14 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     <div class="card-header">🔎 Detailed Forensics & Proof</div>
     
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
-      <div class="glass" style="padding: 24px; background: rgba(0,0,0,0.04); border-radius: 16px; box-shadow: none;">
+      <div class="glass" style="padding: 24px; background: var(--inner-bg); border-radius: 16px; box-shadow: none;">
         <div style="margin-bottom: 20px; font-size: 0.9em; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Agent Confidence Levels</div>
-        {conf_bar(decomp.get('overall_confidence'), "Decomposition Analysis Agent")}
+        {conf_bar(decomp.get('overall_confidence'), '<span class="agent-tooltip" data-tooltip="Dissects binary artifacts, identifies deeply embedded or hidden open-source dependencies not declared in vendor SBOMs.">Decomposition Analysis Agent ⓘ</span>')}
         <div style="margin-top: 16px;"></div>
-        {conf_bar(prov.get('overall_confidence'), "Provenance Verification Agent")}
+        {conf_bar(prov.get('overall_confidence'), '<span class="agent-tooltip" data-tooltip="Verifies digital signatures, certificates, origin country, and ensures alignment with Zero-Trust policies.">Provenance Verification Agent ⓘ</span>')}
       </div>
       
-      <div class="glass" style="padding: 24px; background: rgba(0,0,0,0.04); border-radius: 16px; display: grid; gap: 14px; font-size: 1em; box-shadow: none;">
+      <div class="glass" style="padding: 24px; background: var(--inner-bg); border-radius: 16px; display: grid; gap: 14px; font-size: 1em; box-shadow: none;">
          <div style="font-size: 0.9em; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Compliance Metadata</div>
          <div>Origin Country: <strong style="float:right; color:var(--accent);">{prov_findings.get('compile_origin','N/A')}</strong></div>
          <div>Cert Validation: <strong style="float:right; color:{'#d93025' if prov_findings.get('cert_status')=='EXPIRED' else '#1e8e3e'}">{prov_findings.get('cert_status','N/A')}</strong></div>
@@ -513,7 +648,8 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
 
     {filters_html}
 
-    <table>
+    <div style="background: var(--glass); border-radius: 12px; padding-bottom: 10px;">
+      <table style="width:100%; table-layout:auto;">
       <thead>
         <tr>
           <th style="width:50px; text-align:center;">Status</th>
@@ -524,6 +660,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
         {threats_rows if threats_rows else "<tr><td colspan='6' style='text-align:center; padding: 70px; color: var(--muted); font-weight: 700; font-size: 1.1em;'>Clean Sweep: No vulnerabilities identified.</td></tr>"}
       </tbody>
     </table>
+    </div>
   </div>
 
   <footer>
@@ -533,7 +670,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
 
 <script>
   const ctx = document.getElementById('riskChart').getContext('2d');
-  new Chart(ctx, {{
+  window.myRiskChart = new Chart(ctx, {{
     type: 'doughnut',
     data: {{
       labels: {json.dumps(sev_labels)},
@@ -554,7 +691,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
           labels: {{ 
             usePointStyle: true, padding: 25,
             font: {{ size: 16, weight: '800', family: "'Inter', sans-serif" }},
-            color: '#1a1b1e'
+            color: (localStorage.getItem('ss-theme') === 'dark' ? '#e2e8f0' : '#1a1b1e')
           }} 
         }},
         tooltip: {{
@@ -569,17 +706,39 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     }}
   }});
 
-  function filterTable(severity, btn) {{
+  window.currentSeverity = 'ALL';
+  window.hiddenToggles = {{
+    'CRITICAL': false,
+    'HIGH': false,
+    'MEDIUM': false,
+    'LOW': false,
+    'FIXED': false
+  }};
+
+  function applyFilters() {{
+    document.querySelectorAll('.threat-row').forEach(row => {{
+      const rowSev = row.dataset.severity;
+      const isFixed = row.classList.contains('is-fixed');
+      
+      // Compute visibility
+      let visible = (window.currentSeverity === 'ALL' || rowSev === window.currentSeverity);
+      if (visible && window.hiddenToggles['FIXED'] && isFixed) visible = false;
+      if (visible && window.hiddenToggles[rowSev]) visible = false;
+
+      row.style.display = visible ? 'table-row' : 'none';
+    }});
+  }}
+
+  function setSeverityFilter(severity, btn) {{
     document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    
-    document.querySelectorAll('.threat-row').forEach(row => {{
-      if (severity === 'ALL' || row.dataset.severity === severity) {{
-        row.style.display = 'table-row';
-      }} else {{
-        row.style.display = 'none';
-      }}
-    }});
+    window.currentSeverity = severity;
+    applyFilters();
+  }}
+
+  function toggleHide(key, checked) {{
+    window.hiddenToggles[key] = checked;
+    applyFilters();
   }}
 
   function toggleFixed(idx, check) {{
@@ -591,15 +750,29 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
       row.classList.remove('is-fixed');
       localStorage.removeItem('ss-fixed-' + idx);
     }}
+    applyFilters();
   }}
 
   // Persistence on load
   window.onload = () => {{
+    const toggleBtn = document.getElementById('themeToggle');
+    toggleBtn.addEventListener('click', () => {{
+      const root = document.documentElement;
+      const isDark = root.getAttribute('data-theme') === 'dark';
+      const newTheme = isDark ? 'light' : 'dark';
+      root.setAttribute('data-theme', newTheme);
+      localStorage.setItem('ss-theme', newTheme);
+      
+      if (window.myRiskChart) {{
+        window.myRiskChart.options.plugins.legend.labels.color = (newTheme === 'dark') ? '#e2e8f0' : '#1a1b1e';
+        window.myRiskChart.update();
+      }}
+    }});
+
     document.querySelectorAll('.fixed-check').forEach((check, idx) => {{
       if (localStorage.getItem('ss-fixed-' + idx)) {{
         check.checked = true;
-        const row = document.getElementById('row-' + idx);
-        if (row) row.classList.add('is-fixed');
+        document.getElementById('row-' + idx).classList.add('is-fixed');
       }}
     }});
   }};
@@ -613,7 +786,7 @@ def write_html_report(arbiter: dict, decomp: dict, prov: dict, ts_str: str):
     
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
-    print_ok(f"HTML report written  → {out_path}")
+    print_ok(f"HTML report written  → {out_path.relative_to(PROJECT_ROOT)}")
 
 
 
@@ -624,64 +797,60 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
     print_banner()
 
     # ── Phase 1 & 2 ────────────────────────────────────────────────────────────
-    if target_binary:
-        from .scanner import run_deep_scan
-        print_section("LIVE BINARY INGESTION & DEEP SCAN", phase=1)
-        target_path = Path(target_binary).resolve()
+    if not target_binary:
+        print_error("FATAL: A target binary path must be provided. Interactive demo mode has been removed for production.")
+        sys.exit(1)
         
-        if vendor_sbom_override and Path(vendor_sbom_override).exists():
-            vendor_sbom_path = Path(vendor_sbom_override).resolve()
-            vendor_sbom = load_json(vendor_sbom_path)
-            print_ok(f"vendor SBOM loaded from CLI override: {vendor_sbom_path.name}")
-        else:
-            # Fallback to smart glob search in target directory
-            search_dir = target_path if target_path.is_dir() else target_path.parent
-            potential_sboms = list(search_dir.glob("*sbom*.json"))
-            if potential_sboms:
-                vendor_sbom_path = potential_sboms[0]
-                vendor_sbom = load_json(vendor_sbom_path)
-                print_ok(f"vendor SBOM auto-detected in directory: {vendor_sbom_path.name}")
-            else:
-                print_warn("No vendor SBOM found. Assuming 0 declared dependencies (Zero-Trust Fallback).")
-                vendor_sbom = {"declared_dependencies": []}
-            
-        metadata_path = (target_path if target_path.is_dir() else target_path.parent) / "update_metadata.json"
-        if metadata_path.exists():
-            metadata = load_json(metadata_path)
-            print_ok(f"update_metadata.json loaded from {metadata_path.name}")
-        else:
-            print_warn("No update metadata found. Policy evaluations will run strictly on binary contents.")
-            metadata = {}
-            
-        if policy_path_override and Path(policy_path_override).exists():
-            policy = load_text(Path(policy_path_override))
-            print_ok(f"zero trust policy loaded from CLI override: {Path(policy_path_override).name}")
-        else:
-            search_dir = target_path if target_path.is_dir() else target_path.parent
-            potential_policies = list(search_dir.glob("*policy*.txt"))
-            if potential_policies:
-                policy_path = potential_policies[0]
-                policy = load_text(policy_path)
-                print_ok(f"Zero-Trust Policy auto-detected in directory: {policy_path.name}")
-            else:
-                # Fallback to the internal example policy if no local one is found
-                policy = load_text(MOCK_DIR / "zero_trust_policy.txt")
-                print_ok("zero_trust_policy.txt loaded (Internal Default Rules)")
-        
-        # Execute Pipeline Deep Scan logic natively
-        deep_scan = run_deep_scan(target_path)
-        print_ok(f"Deep scan phase successfully generated internal SBOM map for {target_path.name}")
-        
+    from .scanner import run_deep_scan
+    print_section("LIVE BINARY INGESTION & DEEP SCAN", phase=1)
+    target_path = Path(target_binary).resolve()
+    
+    if vendor_sbom_override and Path(vendor_sbom_override).exists():
+        vendor_sbom_path = Path(vendor_sbom_override).resolve()
+        vendor_sbom = load_json(vendor_sbom_path)
+        print_ok(f"vendor SBOM loaded from CLI override: {vendor_sbom_path.name}")
     else:
-        print_section("LOADING MOCK DEMO PAYLOAD", phase=1)
-        vendor_sbom = load_json(MOCK_DIR / "vendor_sbom.json")
-        deep_scan   = load_json(MOCK_DIR / "deep_scan_sbom.json")
-        metadata    = load_json(MOCK_DIR / "update_metadata.json")
-        policy      = load_text(MOCK_DIR / "zero_trust_policy.txt")
-        print_ok("vendor_sbom.json      loaded")
-        print_ok("deep_scan_sbom.json   loaded")
-        print_ok("update_metadata.json  loaded")
-        print_ok("zero_trust_policy.txt loaded")
+        # Fallback to smart glob search in target directory
+        search_dir = target_path if target_path.is_dir() else target_path.parent
+        potential_sboms = list(search_dir.glob("*sbom*.json"))
+        if potential_sboms:
+            vendor_sbom_path = potential_sboms[0]
+            vendor_sbom = load_json(vendor_sbom_path)
+            print_ok(f"vendor SBOM auto-detected in directory: {vendor_sbom_path.name}")
+        else:
+            print_warn("No vendor SBOM found. Assuming 0 declared dependencies (Zero-Trust Fallback).")
+            vendor_sbom = {"declared_dependencies": []}
+        
+    metadata_path = (target_path if target_path.is_dir() else target_path.parent) / "update_metadata.json"
+    if metadata_path.exists():
+        metadata = load_json(metadata_path)
+        print_ok(f"update_metadata.json loaded from {metadata_path.name}")
+    else:
+        print_warn("No update metadata found. Policy evaluations will run strictly on binary contents.")
+        metadata = {}
+        
+    if policy_path_override and Path(policy_path_override).exists():
+        policy = load_text(Path(policy_path_override))
+        print_ok(f"zero trust policy loaded from CLI override: {Path(policy_path_override).name}")
+    else:
+        search_dir = target_path if target_path.is_dir() else target_path.parent
+        potential_policies = list(search_dir.glob("*policy*.txt"))
+        if potential_policies:
+            policy_path = potential_policies[0]
+            policy = load_text(policy_path)
+            print_ok(f"Zero-Trust Policy auto-detected in directory: {policy_path.name}")
+        else:
+            # For production missing a policy, fallback to the internal default policy
+            if config.DEFAULT_POLICY.exists():
+                policy = load_text(config.DEFAULT_POLICY)
+                print_ok("zero_trust_policy.txt loaded from Internal Default Rules")
+            else:
+                print_warn("No local or internal policy found. Defaulting to strict inference.")
+                policy = "Default strict zero-trust parameters inferred."
+    
+    # Execute Pipeline Deep Scan logic natively
+    deep_scan = run_deep_scan(target_path)
+    print_ok(f"Deep scan phase successfully generated internal SBOM map for {target_path.name}")
 
     print_section("PYTHON PRE-PROCESSING  (no LLM tokens consumed)", phase=2)
     diff = compute_sbom_diff(vendor_sbom, deep_scan)
@@ -695,10 +864,18 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
 
     # ── Phase 3: Decomposition Agent ─────────────────────────────────────────
     print_section("DECOMPOSITION AGENT  [NIST SP 800-218 — PO.1.1]", phase=3)
-    print_info("Querying ibm/granite-3-3-8b-instruct ...")
+    print_info(f"Processing {diff.get('hidden_count', 0)} hidden deps → "
+               f"{-(-diff.get('hidden_count',0) // config.DECOMP_CHUNK_SIZE) or 1} batch(es) "
+               f"× {config.DECOMP_CHUNK_SIZE} pkgs, up to {config.DECOMP_MAX_THREADS} parallel threads ...")
     decomp_result = decomposition_agent.run(diff, cve_matches)
+    print_ok(f"Batches processed     : {decomp_result.get('batch_count', 1)} "
+             f"({decomp_result.get('thread_count', 1)} thread(s), "
+             f"{decomp_result.get('wall_clock_seconds', '?')}s wall-clock)")
+    print_ok(f"Findings returned     : {decomp_result.get('actual_finding_count', len(decomp_result.get('findings', [])))} hidden dependency assessments")
     print_ok(f"Confidence score      : {decomp_result.get('overall_confidence')}")
-    print_ok(f"Findings returned     : {len(decomp_result.get('findings', []))} hidden dependency assessments")
+    if decomp_result.get("grounding_warnings"):
+        print_warn(f"Grounding warnings    : {len(decomp_result['grounding_warnings'])} hallucination(s) stripped")
+
 
     # ── Phase 4: Provenance Agent ─────────────────────────────────────────────
     print_section("PROVENANCE AGENT  [NIST SP 800-218 — PO.3.2]", phase=4)
@@ -721,13 +898,9 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
     else:
         print_ok("All confidence scores above threshold — proceeding to verdict")
     print_info("Querying ibm/granite-3-3-8b-instruct ...")
-    if target_binary:
-        target_path = Path(target_binary)
-        pkg_name = target_path.name
-        vnd_name = "Unknown Vendor"
-    else:
-        pkg_name = "DataBridge-Enterprise v4.2.1"
-        vnd_name = "NexaTech Solutions"
+    target_path = Path(target_binary)
+    pkg_name = target_path.name
+    vnd_name = "Unknown Vendor"
 
     arbiter_result = arbiter_agent.run(
         decomp_findings=decomp_result, 
@@ -739,8 +912,8 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
     # ── Phase 6: Generate output reports ─────────────────────────────────────
     print_section("GENERATING INSPECTION REPORTS", phase=6)
     ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    write_text_report(arbiter_result, decomp_result, prov_result, ts_str)
-    write_html_report(arbiter_result, decomp_result, prov_result, ts_str)
+    write_json_report(arbiter_result, decomp_result, prov_result, ts_str, cve_matches)
+    write_html_report(arbiter_result, decomp_result, prov_result, ts_str, cve_matches)
 
     # ── Final verdict ─────────────────────────────────────────────────────────
     verdict = arbiter_result.get("verdict", "UNKNOWN")
@@ -757,12 +930,20 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
     print()
     print_info(f"Package    : {arbiter_result.get('package')}")
     print_info(f"Threats    : {arbiter_result.get('total_violations', 0)} confirmed")
+    
     rationale = arbiter_result.get("verdict_rationale", "")
-    for line in textwrap.wrap(f"Rationale  : {rationale}", width=64):
-        print(f"  {line}")
-    print_info(f"Action     : {arbiter_result.get('recommended_action', 'N/A')}")
+    wrapped_rationale = textwrap.fill(rationale, width=80, initial_indent="  → Rationale  : ", subsequent_indent="                 ")
+    wrapped_rationale = wrapped_rationale.replace("  → Rationale  : ", f"  {_c(CYAN, '→')} Rationale  : ", 1)
+    print(wrapped_rationale)
+    
+    action = arbiter_result.get("recommended_action", "N/A")
+    wrapped_action = textwrap.fill(action, width=80, initial_indent="  → Action     : ", subsequent_indent="                 ")
+    wrapped_action = wrapped_action.replace("  → Action     : ", f"  {_c(CYAN, '→')} Action     : ", 1)
+    print(wrapped_action)
     print()
-    print_ok(f"Full reports saved to ./{OUTPUT_DIR}/")
+    out_pkg_name = arbiter_result.get("package", "UnknownApp").replace(" ", "_")
+    final_dir = OUTPUT_DIR.relative_to(PROJECT_ROOT) / out_pkg_name
+    print_ok(f"Full reports saved to .\\{final_dir}\\")
     print(_c(CYAN, "═" * 68))
 
 

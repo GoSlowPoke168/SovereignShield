@@ -55,15 +55,9 @@ if __name__ == "__main__":
     from sovereignshield import main
     
     parser = argparse.ArgumentParser(description="SovereignShield Customs Pipeline")
-    parser.add_argument("--target", type=str, help="Path to a live binary to scan.")
-    parser.add_argument("--demo", action="store_true", help="Run the pipeline in demonstration mode using mock data.")
+    parser.add_argument("--target", type=str, required=True, help="Path to a live binary to scan.")
     parser.add_argument("--policy", type=str, help="Path to a custom zero trust policy file")
     parser.add_argument("--vendor-sbom", type=str, help="Path to a custom vendor sbom file")
     
     args = parser.parse_args()
-    
-    if args.target:
-        main.run_pipeline(target_binary=args.target, policy_path_override=args.policy, vendor_sbom_override=args.vendor_sbom)
-    else:
-        print("\n\033[93m[INFO] Running in DEMO mode. (Pass --target <path> to scan a live binary)\033[0m")
-        main.run_pipeline(target_binary=None)
+    main.run_pipeline(target_binary=args.target, policy_path_override=args.policy, vendor_sbom_override=args.vendor_sbom)
