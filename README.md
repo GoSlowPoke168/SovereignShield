@@ -11,10 +11,10 @@ SovereignShield is a universally adaptable, enterprise-grade, crash-resistant se
 
 ```text
 [Software Target] → [Deep Scan / Manifest Discovery] → [Python Pre-Processor]
-                                                   → [Decomposition Agent]
-                                                   → [Provenance Agent]
-                                                   → [Arbiter Agent]
-                                                   → [Inspection Dashboard (BLOCK | ALLOW)]
+                                                     → [Decomposition Agent]
+                                                     → [Provenance Agent]
+                                                     → [Arbiter Agent]
+                                                     → [Inspection Dashboard (BLOCK | ALLOW)]
 ```
 
 ---
