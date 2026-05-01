@@ -879,7 +879,7 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
 
     # ── Phase 4: Provenance Agent ─────────────────────────────────────────────
     print_section("PROVENANCE AGENT  [NIST SP 800-218 — PO.3.2]", phase=4)
-    print_info("Querying ibm/granite-3-3-8b-instruct ...")
+    print_info("Querying ibm/granite-4-h-small ...")
     prov_result = provenance_agent.run(metadata, policy)
     print_ok(f"Confidence score      : {prov_result.get('overall_confidence')}")
     viol_count = len(prov_result.get("findings", {}).get("violations", []))
@@ -897,7 +897,7 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
         print_warn(f"Low-confidence flag triggered — secondary review embedded in report")
     else:
         print_ok("All confidence scores above threshold — proceeding to verdict")
-    print_info("Querying ibm/granite-3-3-8b-instruct ...")
+    print_info("Querying ibm/granite-4-h-small ...")
     target_path = Path(target_binary)
     pkg_name = target_path.name
     vnd_name = "Unknown Vendor"

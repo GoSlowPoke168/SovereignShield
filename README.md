@@ -1,7 +1,7 @@
 # SovereignShield 🛡️
 
 **Automated Supply-Chain Customs Inspection Pipeline**  
-NIST SP 800-218 Aligned · IBM Granite 3.3 · Zero-Trust Architecture
+NIST SP 800-218 Aligned · IBM Granite 4 · Zero-Trust Architecture
 
 ---
 
@@ -126,7 +126,7 @@ sovereignshield/
 
 ## Model Configuration
 
-All three agents exclusively utilize **IBM Granite 3.3 8B Instruct** (`ibm/granite-3-3-8b-instruct`) running on watsonx.ai.
+All three agents exclusively utilize **IBM Granite 4 (Small)** (`ibm/granite-4-h-small`) running on watsonx.ai.
 
 The pipeline is tuned with an absolute zero-temperature (`0.0`) configuration for rigid, deterministic security verdicts avoiding LLM hallucinations, while keeping robust token limits enabling it to inspect extensive and nested dependency chains successfully without context overflow.
 
