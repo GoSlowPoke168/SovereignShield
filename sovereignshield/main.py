@@ -852,7 +852,7 @@ def run_pipeline(target_binary: str | None = None, policy_path_override: str | N
     deep_scan = run_deep_scan(target_path)
     print_ok(f"Deep scan phase successfully generated internal SBOM map for {target_path.name}")
 
-    print_section("PYTHON PRE-PROCESSING  (no LLM tokens consumed)", phase=2)
+    print_section("PYTHON PRE-PROCESSING", phase=2)
     diff = compute_sbom_diff(vendor_sbom, deep_scan)
     cve_matches = cross_reference_cves(diff)
     print_info(f"Vendor-declared deps  : {diff['total_vendor_declared']}")
