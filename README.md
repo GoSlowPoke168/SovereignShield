@@ -58,12 +58,16 @@ WATSONX_URL=https://us-south.ml.cloud.ibm.com
 # Windows
 python -m venv .venv
 
-.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+.\.venv\Scripts\Activate.ps1
 
 # macOS/Linux
-python -m venv .venv
+python -m venv venv
 
-source .venv/bin/activate
+pip install -r requirements.txt
+
+source ./venv/bin/activate
 ```
 
 > If you need to recreate it: `python -m venv .venv && pip install -r requirements.txt`
